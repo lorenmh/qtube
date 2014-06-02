@@ -1,0 +1,83 @@
+<html>
+<head>
+  <!--scripts-->
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="/js/ytplayer.js"></script>
+  <script src="/js/app.js"></script>
+
+  <!--styles-->
+  <link rel="stylesheet" type="text/css" href="css/styles.css" />
+</head>
+<!--Angular App queueTube-->
+<body ng-app="queueTube">
+  <!--Angular Controller PlayerController-->
+  <div class="wrapper" id="player-controller" ng-controller="PlayerController">
+    <div id="player-section-wrapper">
+    <div id="player-section">
+
+      <div id="player-wrapper">
+        <div id="player"><!--YouTube iFrame API binds to this div--></div>
+      </div>
+
+      <div id="button-wrapper">
+        <div id="player-prev" class="flat-button player-button" ng-click="playPrevVideo()">Previous<!--inline-block-->
+        </div><div id="player-pause" class="flat-button player-button" ng-click="pauseVideo()">Pause<!--inline-block-->
+        </div><div id="player-play" class="flat-button player-button" ng-click="playVideo()">Play<!--inline-block-->
+        </div><div id="player-next" class="flat-button player-button last-btn" ng-click="playNextVideo()">Next</div><!--inline-block-->
+      </div>
+      </div>
+
+    </div>
+    <div id="player-list">
+    <div id="player-queue"><!--inline-block-->
+      <span id="queue-title" class="list-toggle active">Queue</span>
+      <ol id="queue-list">
+        <li class="queue-item" ng-repeat="video in videoQueue track by $index" ng-click="playNow($index)"
+            ng-class="{selected: $index==videoIndex}">
+            {[ 'h' + video.title | less_than_index:$index:$scope.videoIndex ]}
+            {[ 'c' + video.title | is_index:$index:$scope.videoIndex ]}
+            {[ 'q' + video.title | grtr_than_index:$index:$scope.videoIndex ]}
+            </li>
+      </ol>
+    </div>
+    <div id="video-search">
+      <form class="search-form" ng-submit="newSearch()">
+        <div id="search-bar">
+          <input id="video-search-input" class="search-input" ng-change="getSearchSuggestions()" type="text" ng-model="searchString" /><input class="flat-button search-button" id="video-search-submit" type="submit" value="Search" />
+        </div>
+        <ul class="search-suggestions">
+            <li ng-repeat="suggestion in searchSuggestions track by $index" ng-click="useSuggestion(suggestion);" title="{[ suggestion ]}">{[ suggestion | trim:40 ]}
+        </ul>
+      </form>
+    </div>
+
+    <div id="search-result-list">
+      <div class="search-result" ng-repeat="search in searchResults track by $index">
+        <h3>{[ search.startIndex ]} through {[ search.startIndex + search.itemsPerPage - 1 ]} of {[ search.totalResults ]} results</h3>
+        <div class="teaser-box" ng-repeat="result in search.results track by $index">
+          <label>
+            <input 
+              type="checkbox"
+              value="{[ result.id ]}"
+              class="teaser-checkbox"
+              ng-checked="videoQueue.indexOf(result) > -1"
+              ng-click="toggleSelection(result)"
+            />
+            <div class="teaser-image-wrap">
+              <img class="teaser-image" ng-src="{[ result.thumbnailUrl ]}" />
+            </div>
+            <span class="teaser-duration">{[ result.durationSeconds ]}</span>
+            <h2 class="teaser-title">{[ result.title ]}</h2>
+            <div class="teaser-info">
+              <p class="teaser-description">{[ result.description ]}</p>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

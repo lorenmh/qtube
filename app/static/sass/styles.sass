@@ -1,0 +1,167 @@
+@import compass/css3
+
+$max-width: 1000px
+$large-size: 20px
+$med-size: 10px
+$small-size: 5px
+
+$font-family: Helvetica, Verdanna, sans-serif
+
+$fg-first: #435C6F
+$fg-second: #EF6960
+$fg-third: #5C7888
+$base-color: #CACACA
+$background: #DDFFEC
+
+$hl-color: #DDFFEC
+$font-color: darken($fg-first, 20%)
+
+$player-height: 539px
+$player-width: 640px
+
+$teaser-width: ($player-width - ( 2 * $large-size ) - $large-size) / 2
+
+$highlight-size: 4px
+
+$button-width: 5 * $large-size
+$button-height: 2 * $large-size
+
+=inset-shadow($size, $color)
+  border-left: $size solid darken($color, 5%)
+  border-right: $size solid darken($color, 5%)
+  border-bottom: $size solid lighten($color, 10%)
+
+=hl-anim-init($durr)
+  +transition-duration($durr)
+  +transition-property(border)
+  border: 0px solid transparent
+
+=hl-anim($size, $color)
+  border-bottom: ($size / 2) solid $color
+
+=bg($color)
+  background-color: $color
+
+=block
+  display: block
+
+=inblock
+  display: inline-block
+
+=relative
+  position: relative
+
+=absolute
+  position: absolute
+
+*
+  +box-sizing(border-box)
+
+html, body
+  +bg($background)
+  color: $font-color
+  font-family: $font-family
+  margin: 0
+  min-height: 100%
+  padding: 0
+  width: 100%
+
+#player-section-wrapper
+  padding-top: 15px
+  height: 420px
+  margin-bottom: 32px
+  +bg(darken($fg-first, 10%))
+
+#player-section
+  +relative
+  margin: auto
+  width: $player-width
+
+#player-section::before
+  +absolute
+  content: ""
+  top: -2 * $small-size
+  left: 0
+  z-index: 1000
+  width: $player-width - ( 2 * $small-size )
+  height: $small-size
+  border-left: $small-size solid transparent
+  border-right: $small-size solid transparent
+  border-bottom: $small-size solid lighten($fg-second, 10%)
+
+.flat-button:hover
+  +hl-anim(4px, $hl-color)
+
+.flat-button.last-btn
+  margin-right: 0
+
+.flat-button
+  +hl-anim-init(.2s)
+  +bg($fg-first)
+  +inblock
+  +relative
+  color: $hl-color
+  cursor: pointer
+  height: $button-height
+  line-height: $button-height
+  margin-right: $large-size
+  text-align: center
+  width: 135px
+
+#player
+  +inset-shadow($small-size, $fg-second)
+  height: 337px
+  width: 600px
+
+#button-wrapper
+  +bg($fg-second)
+  padding: 0 $large-size $large-size $large-size
+
+#player-wrapper
+  +bg($fg-second)
+  padding: $large-size
+
+#player-list
+  width: $player-width
+  padding: 0 0 0 $large-size
+  margin: auto
+
+#video-search-input
+  +inblock
+  font-size: $large-size
+  padding: $med-size
+  height: 2 * $large-size
+  width: 445px
+  margin-right: $large-size
+
+#video-search-submit
+  margin-right: 0
+
+.teaser-box
+  +relative
+  +inblock
+  height: 190px
+  float: left
+  margin-right: $large-size
+  width: $teaser-width
+
+.teaser-image-wrap
+  width: 100%
+  height: 162px
+  overflow: hidden
+
+.teaser-image
+  margin-top: -28px
+  width: 100%
+
+.teaser-title
+  +absolute
+  +bg(rgba(0,0,0,.6))
+  width: 290px
+  height: 162px
+  text-align: center
+  left: 0
+  padding: 10px
+  bottom: -9px
+  color: $fg-second
+  text-shadow: 0 2px black
