@@ -36,9 +36,10 @@
       <ol id="queue-list">
         <li class="queue-item" ng-repeat="video in videoQueue track by $index" ng-click="playNow($index)"
             ng-class="{selected: $index==videoIndex}">
-            {[ 'h' + video.title | less_than_index:$index:$scope.videoIndex ]}
+            <!--{[ 'h' + video.title | less_than_index:$index:$scope.videoIndex ]}
             {[ 'c' + video.title | is_index:$index:$scope.videoIndex ]}
-            {[ 'q' + video.title | grtr_than_index:$index:$scope.videoIndex ]}
+            {[ 'q' + video.title | grtr_than_index:$index:$scope.videoIndex ]}-->
+            {[ video.title ]}
             </li>
       </ol>
     </div>
@@ -48,7 +49,7 @@
           <input id="video-search-input" class="search-input" ng-change="getSearchSuggestions()" type="text" ng-model="searchString" /><input class="flat-button search-button" id="video-search-submit" type="submit" value="Search" />
         </div>
         <ul class="search-suggestions">
-            <li ng-repeat="suggestion in searchSuggestions track by $index" ng-click="useSuggestion(suggestion);" title="{[ suggestion ]}">{[ suggestion | trim:40 ]}
+            <li ng-repeat="suggestion in searchSuggestions track by $index" ng-click="useSuggestion(suggestion);" title="{[ suggestion ]}">{[ suggestion | trim:50 ]}
         </ul>
       </form>
     </div>

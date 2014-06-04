@@ -19,6 +19,8 @@ $font-color: darken($fg-first, 20%)
 $player-height: 539px
 $player-width: 640px
 
+$searchbar-width: 445px
+
 $teaser-width: ($player-width - ( 2 * $large-size ) - $large-size) / 2
 
 $highlight-size: 4px
@@ -131,7 +133,7 @@ html, body
   font-size: $large-size
   padding: $med-size
   height: 2 * $large-size
-  width: 445px
+  width: $searchbar-width
   margin-right: $large-size
 
 #video-search-submit
@@ -153,6 +155,23 @@ html, body
 .teaser-image
   margin-top: -28px
   width: 100%
+
+.search-suggestions
+  +bg(white)
+  margin-top: -1px
+  padding: 0
+  width: $searchbar-width
+  list-style-type: none
+
+.search-suggestions > li
+  padding: 5px 10px 5px 10px
+  cursor: pointer
+  margin: 0 5px
+
+.search-suggestions > li:hover
+  +bg(rgba(0,0,0,.05))
+  border: 2px solid $fg-second
+  padding: 3px 8px 3px 8px
 
 .teaser-title
   +absolute
