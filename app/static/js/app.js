@@ -8,8 +8,122 @@
  * Created by Loren Howard, lorenhoward.com
  */
 
-var app = angular.module('queueTube', []);
+function Video(id, author, title, thumb_url, desc, dur_s) {
+  this.id = id;
+  this.author = author;
+  this.title = title;
+  this.thumb_url = thumb_url;
+  this.desc = desc;
+  this.dur_s = dur_s;
+}
 
+Video.prototype.toObj = function() {
+  var property_obj = {
+    'id': this.id,
+    'author': this.author,
+    'title': this.title,
+    'thumb_url': this.thumb_url,
+    'desc': this.desc,
+    'dur_s': this.dur_s
+  };
+  var obj = {
+    'class': 'Video',
+    'data': property_obj
+  };
+  return obj;
+};
+
+Video.prototype.toJson = function() {
+  return JSON.stringify(this.toObj());
+};
+
+// when Video.fromJsonObject will be called, we should already have an Object
+// (without text) this object will contain the properties of the Video object we
+// want to construct
+Video.fromJsonObject = function(obj) {
+  return new Video(
+      obj.data.id,
+      obj.data.author,
+      obj.data.title,
+      obj.data.thumb_url,
+      obj.data.desc,
+      obj.data.dur_s
+  );
+};
+
+function Queue(id, videos, index, play_time) {
+  this.id = id;
+  this.videos = videos;
+  this.index = index;
+  this.play_time = play_time;
+}
+
+Queue.prototype.toObj = function() {
+  var videos_array = [];
+  for (var i = 0; i < this.videos.length; i++) {
+    videos_array.push(this.videos[i].toObj());
+  }
+  
+  var property_obj = {
+    'id': this.id,
+    'videos': videos_array,
+    'index': this.index,
+    'play_time': this.play_time
+  };
+
+  var obj = {
+    'class': 'Queue',
+    'data': property_obj
+  };
+  return obj;
+};
+
+Queue.prototype.toJson = function() {
+  return JSON.stringify(this.toObj());
+};
+
+Queue.fromJsonObject = function(obj) {
+  var videos = [];
+  for (var i = 0; i < obj.data.videos.length; i++) {
+    videos.push(Video.fromJsonObject(obj.data.videos[i]));
+  }
+  return new Queue(
+      obj.data.id,
+      videos,
+      obj.data.index,
+      obj.data.play_time
+  );
+};
+
+
+function onPlayerStateChange(event) {
+  if (event.data == YT.PlayerState.ENDED) {
+    // this grabs the scope of the PlayerController
+    var scope = angular.element(document.getElementById('player-controller'))
+      .scope();
+        
+    if (scope.videoQueue.length > 0) {
+      //then the playNextVideo function is called
+      scope.playNextVideo();
+      //then the $apply function is called to update the changes in the scope
+      scope.$apply();
+    }
+  }
+}
+
+function stopVideo() {
+  player.stopVideo();
+}
+
+
+// 4. The API will call this function when the video player is ready.
+function onPlayerReady(event) {
+  if (event.data != YT.PlayerState.PAUSED) {
+    event.target.playVideo();
+  }
+}
+
+var app = angular.module('queueTube', ['ui.sortable']);
 
 app.config( function($interpolateProvider) {
   $interpolateProvider.startSymbol('{[');
@@ -32,14 +146,6 @@ function formatSeconds(seconds) {
   return (hours + ":" + minutes + ":" + modSeconds);
 }
 
-function Video(id, author, title, thumbnailUrl, description, durationSeconds) {
-  this.id = id;
-  this.author = author;
-  this.title = title;
-  this.thumbnailUrl = thumbnailUrl;
-  this.description = description;
-  this.durationSeconds = durationSeconds;
-}
 
 /**
  * filterGoogleData takes Google's search results and puts some of the data into
@@ -62,13 +168,13 @@ function filterGoogleData(data) {
 
     var author = entry.author[0].name.$t;
     var title = entry.title.$t;
-    var thumbnailUrl = entry.media$group.media$thumbnail[0].url;
-    var description = entry.media$group.media$description.$t;
+    var thumb_url = entry.media$group.media$thumbnail[0].url;
+    var desc = entry.media$group.media$description.$t;
 
-    var durationSeconds = formatSeconds(
+    var dur_s = formatSeconds(
         entry.media$group.yt$duration.seconds);
 
-    var video = new Video(id, author, title, thumbnailUrl, description, durationSeconds);
+    var video = new Video(id, author, title, thumb_url, desc, dur_s);
 
     newData.results.push(video);
   }
@@ -84,14 +190,6 @@ function googleDataToTitleList(data) {
   return newList;
 }
 
-/**
- * getSearchResults takes a shortened query string as its parameter, which would
- * include the start index, the results per page, and the escaped search string.
- * An example argument would be '1&max-results=10&q=Cats'.  When this string is 
- * appended to the end of the GET request, it would return the search results of
- * index 1 through 10 for the search 'Cats'.
- * Uses promises with the then function.
- */
 app.factory('searchService', function($http) {
   return {
     getSearchResults: function( q ) {
@@ -134,41 +232,12 @@ angular.module('ng').filter('trim', function() {
   };
 });
 
-angular.module('ng').filter('less_than_index', function() {
-  return function(val, this_index, vid_index) {
-    if (this_index < vid_index) {
-      return val;
-    } else {
-      return '';
-    }
-  };
-});
-
-angular.module('ng').filter('grtr_than_index', function() {
-  return function(val, this_index, vid_index) {
-    if (this_index > vid_index) {
-      return val;
-    } else {
-      return '';
-    }
-  };
-});
-
-angular.module('ng').filter('is_index', function() {
-  return function(val, this_index, vid_index) {
-    if (this_index == vid_index) {
-      return val;
-    } else {
-      return '';
-    }
-  };
-});
-
 // Angular controller, uses the searchService for asynchronous search
 app.controller('PlayerController', function( searchService, $scope, $interval ) {
   $scope.videoQueue = []; //Queue - holds the queue of videos
   $scope.videoIndex = -1;
-  
+  //$scope.player = player;
+
   // $scope.searchResults holds a list of search results. 
   // ex: [ [search results 1-10], [search results 11-20], ... etc ]
   $scope.searchResults = []; 
@@ -300,6 +369,9 @@ app.controller('PlayerController', function( searchService, $scope, $interval ) 
     }
   };
 
+  console.log($scope);
+  console.log($scope.player);
+
   $scope.loadMoreSearchResults = function() {
     if (storedSearchString && !currentlySearching) {
       currentlySearching = true;
@@ -344,3 +416,4 @@ $(document).ready( function() {
     }
   });
 });
+

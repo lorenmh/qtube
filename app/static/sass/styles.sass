@@ -68,6 +68,9 @@ html, body
   padding: 0
   width: 100%
 
+form
+  margin: 0
+
 #player-section-wrapper
   padding-top: 15px
   height: 420px
@@ -125,7 +128,7 @@ html, body
 
 #player-list
   width: $player-width
-  padding: 0 0 0 $large-size
+  //padding: 0 0 0 $large-size
   margin: auto
 
 #video-search-input
@@ -135,6 +138,10 @@ html, body
   height: 2 * $large-size
   width: $searchbar-width
   margin-right: $large-size
+
+#video-search
+  +bg(red)
+  padding: $large-size
 
 #video-search-submit
   margin-right: 0

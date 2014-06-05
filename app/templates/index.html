@@ -1,10 +1,12 @@
 <html>
 <head>
   <!--scripts-->
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
   <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.2.16/angular.min.js"></script>
-  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="/js/ytplayer.js"></script>
+  <script src="/js/module/sortable.js"></script>
   <script src="/js/app.js"></script>
 
   <!--styles-->
@@ -33,7 +35,7 @@
     <div id="player-list">
     <div id="player-queue"><!--inline-block-->
       <span id="queue-title" class="list-toggle active">Queue</span>
-      <ol id="queue-list">
+      <ol id="queue-list" ng-model="videoQueue" ui-sortable>
         <li class="queue-item" ng-repeat="video in videoQueue track by $index" ng-click="playNow($index)"
             ng-class="{selected: $index==videoIndex}">
             <!--{[ 'h' + video.title | less_than_index:$index:$scope.videoIndex ]}
@@ -48,7 +50,7 @@
         <div id="search-bar">
           <input id="video-search-input" class="search-input" ng-change="getSearchSuggestions()" type="text" ng-model="searchString" /><input class="flat-button search-button" id="video-search-submit" type="submit" value="Search" />
         </div>
-        <ul class="search-suggestions">
+        <ul class="search-suggestions" ng-hide="searchSuggestions.length == 0">
             <li ng-repeat="suggestion in searchSuggestions track by $index" ng-click="useSuggestion(suggestion);" title="{[ suggestion ]}">{[ suggestion | trim:50 ]}
         </ul>
       </form>

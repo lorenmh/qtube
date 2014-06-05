@@ -17,6 +17,11 @@ html, body {
 }
 
 /* line 71, ../sass/styles.sass */
+form {
+  margin: 0;
+}
+
+/* line 74, ../sass/styles.sass */
 #player-section-wrapper {
   padding-top: 15px;
   height: 420px;
@@ -24,14 +29,14 @@ html, body {
   background-color: #30424f;
 }
 
-/* line 77, ../sass/styles.sass */
+/* line 80, ../sass/styles.sass */
 #player-section {
   position: relative;
   margin: auto;
   width: 640px;
 }
 
-/* line 82, ../sass/styles.sass */
+/* line 85, ../sass/styles.sass */
 #player-section::before {
   position: absolute;
   content: "";
@@ -45,17 +50,17 @@ html, body {
   border-bottom: 5px solid #f4958e;
 }
 
-/* line 94, ../sass/styles.sass */
+/* line 97, ../sass/styles.sass */
 .flat-button:hover {
   border-bottom: 2px solid #ddffec;
 }
 
-/* line 97, ../sass/styles.sass */
+/* line 100, ../sass/styles.sass */
 .flat-button.last-btn {
   margin-right: 0;
 }
 
-/* line 100, ../sass/styles.sass */
+/* line 103, ../sass/styles.sass */
 .flat-button {
   -webkit-transition-duration: 0.2s;
   -moz-transition-duration: 0.2s;
@@ -78,7 +83,7 @@ html, body {
   width: 135px;
 }
 
-/* line 113, ../sass/styles.sass */
+/* line 116, ../sass/styles.sass */
 #player {
   border-left: 5px solid #ed5349;
   border-right: 5px solid #ed5349;
@@ -87,26 +92,25 @@ html, body {
   width: 600px;
 }
 
-/* line 118, ../sass/styles.sass */
+/* line 121, ../sass/styles.sass */
 #button-wrapper {
   background-color: #ef6960;
   padding: 0 20px 20px 20px;
 }
 
-/* line 122, ../sass/styles.sass */
+/* line 125, ../sass/styles.sass */
 #player-wrapper {
   background-color: #ef6960;
   padding: 20px;
 }
 
-/* line 126, ../sass/styles.sass */
+/* line 129, ../sass/styles.sass */
 #player-list {
   width: 640px;
-  padding: 0 0 0 20px;
   margin: auto;
 }
 
-/* line 131, ../sass/styles.sass */
+/* line 134, ../sass/styles.sass */
 #video-search-input {
   display: inline-block;
   font-size: 20px;
@@ -116,12 +120,18 @@ html, body {
   margin-right: 20px;
 }
 
-/* line 139, ../sass/styles.sass */
+/* line 142, ../sass/styles.sass */
+#video-search {
+  background-color: red;
+  padding: 20px;
+}
+
+/* line 146, ../sass/styles.sass */
 #video-search-submit {
   margin-right: 0;
 }
 
-/* line 142, ../sass/styles.sass */
+/* line 149, ../sass/styles.sass */
 .teaser-box {
   position: relative;
   display: inline-block;
@@ -131,20 +141,20 @@ html, body {
   width: 290px;
 }
 
-/* line 150, ../sass/styles.sass */
+/* line 157, ../sass/styles.sass */
 .teaser-image-wrap {
   width: 100%;
   height: 162px;
   overflow: hidden;
 }
 
-/* line 155, ../sass/styles.sass */
+/* line 162, ../sass/styles.sass */
 .teaser-image {
   margin-top: -28px;
   width: 100%;
 }
 
-/* line 159, ../sass/styles.sass */
+/* line 166, ../sass/styles.sass */
 .search-suggestions {
   background-color: white;
   margin-top: -1px;
@@ -153,21 +163,21 @@ html, body {
   list-style-type: none;
 }
 
-/* line 166, ../sass/styles.sass */
+/* line 173, ../sass/styles.sass */
 .search-suggestions > li {
   padding: 5px 10px 5px 10px;
   cursor: pointer;
   margin: 0 5px;
 }
 
-/* line 171, ../sass/styles.sass */
+/* line 178, ../sass/styles.sass */
 .search-suggestions > li:hover {
   background-color: rgba(0, 0, 0, 0.05);
   border: 2px solid #ef6960;
   padding: 3px 8px 3px 8px;
 }
 
-/* line 176, ../sass/styles.sass */
+/* line 183, ../sass/styles.sass */
 .teaser-title {
   position: absolute;
   background-color: rgba(0, 0, 0, 0.6);
