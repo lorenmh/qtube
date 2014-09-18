@@ -7,17 +7,25 @@ $small-size: 5px
 
 $font-family: Helvetica, Verdanna, sans-serif
 
-$fg-first: #435C6F
-$fg-second: #EF6960
-$fg-third: #5C7888
-$base-color: #CACACA
-$background: #DDFFEC
+/*https://kuler.adobe.com/JR-01-Cool-color-theme-3904982/edit/?copy=true&base=2&rule=Custom&selected=2&name=Copy%20of%20JR-01-Cool&mode=rgb&rgbvalues=0.19607843137254902,0.22745098039215686,0.27450980392156865,0.13333333333333333,0.1568627450980392,0.1843137254901961,0.9215686274509803,0.2901960784313726,0.2,1,1,1,0.9137254901960784,0.9411764705882353,0.9607843137254902&swatchOrder=0,1,2,3,4*/
 
-$hl-color: #DDFFEC
-$font-color: darken($fg-first, 20%)
+$fg-first: #22282F //#1d2128
+$fg-second: #323A46
+$fg-third: #EF6960//#EB4A33
+$fg-fourth: #FF9D84
+$fg-fifth: #F0E797
+$base-color: #E9F0F5
+$background: white
+$button-text: #BDBDBD
+
+
+$hl-color: #EF6960 //'highlight color'
+$font-color: $fg-first
 
 $player-height: 539px
 $player-width: 640px
+
+$searchbar-width: 445px
 
 $teaser-width: ($player-width - ( 2 * $large-size ) - $large-size) / 2
 
@@ -27,8 +35,8 @@ $button-width: 5 * $large-size
 $button-height: 2 * $large-size
 
 =inset-shadow($size, $color)
-  border-left: $size solid darken($color, 5%)
-  border-right: $size solid darken($color, 5%)
+  border-left: $size solid darken($color, 3%)
+  border-right: $size solid darken($color, 3%)
   border-bottom: $size solid lighten($color, 10%)
 
 =hl-anim-init($durr)
@@ -66,11 +74,14 @@ html, body
   padding: 0
   width: 100%
 
+form
+  margin: 0
+
 #player-section-wrapper
   padding-top: 15px
   height: 420px
   margin-bottom: 32px
-  +bg(darken($fg-first, 10%))
+  +bg($fg-first)
 
 #player-section
   +relative
@@ -90,17 +101,16 @@ html, body
   border-bottom: $small-size solid lighten($fg-second, 10%)
 
 .flat-button:hover
-  +hl-anim(4px, $hl-color)
+  +hl-anim(4px, $fg-third)
 
 .flat-button.last-btn
   margin-right: 0
 
 .flat-button
   +hl-anim-init(.2s)
-  +bg($fg-first)
   +inblock
   +relative
-  color: $hl-color
+  color: $button-text
   cursor: pointer
   height: $button-height
   line-height: $button-height
@@ -123,7 +133,7 @@ html, body
 
 #player-list
   width: $player-width
-  padding: 0 0 0 $large-size
+  //padding: 0 0 0 $large-size
   margin: auto
 
 #video-search-input
@@ -131,8 +141,12 @@ html, body
   font-size: $large-size
   padding: $med-size
   height: 2 * $large-size
-  width: 445px
+  width: $searchbar-width
   margin-right: $large-size
+
+#video-search
+  +bg($fg-third)
+  padding: $large-size
 
 #video-search-submit
   margin-right: 0
@@ -153,6 +167,24 @@ html, body
 .teaser-image
   margin-top: -28px
   width: 100%
+
+.search-suggestions
+  +bg(white)
+  margin-top: -1px
+  margin-bottom: 0
+  padding: 0
+  width: $searchbar-width
+  list-style-type: none
+
+.search-suggestions > li
+  padding: 5px 10px 5px 10px
+  cursor: pointer
+  margin: 0 5px
+
+.search-suggestions > li:hover
+  +bg(rgba(0,0,0,.05))
+  border: 2px solid $fg-second
+  padding: 3px 8px 3px 8px
 
 .teaser-title
   +absolute

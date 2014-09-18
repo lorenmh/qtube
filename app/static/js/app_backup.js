@@ -1,11 +1,19 @@
-/*//////////////////////////////////////////////////////////////////////////////
-Created by Loren Howard, August 2014 - Build 1
-qtube is a YouTube API wrapper written in AngularJS which allows users to easily
-create and save playlists.  In Build 2 I hope to add websockets functionality
-so that a user can use their mobile phone as a remote control.
-/*//////////////////////////////////////////////////////////////////////////////
+// tie player element name to the directive!
 
-// module for the YouTube player
+/*///////////////////////////////////////////////
+NOTES AND ODD SHIT
+
+@suggestions:
+- Input is throttled to one get request each 200 ms
+- Once the request is returned, the results are throttled to 500ms.
+this means:
+- Every 200ms that a user inputs it will make one request
+- The suggestions will update at most once per 500ms.
+
+
+
+/*///////////////////////////////////////////////
+
 var player = angular.module('player', []);
 
 // the YouTube API player element's ID
@@ -62,6 +70,7 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
   // OBSERVERS
   var stateObserverCbs = [];
   var readyObserverCbs = [];
+  var apiReadyObserverCbs = [];
 
   srv.regStateObserverCb = function(cb) {
     stateObserverCbs.push(cb);
@@ -71,28 +80,41 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
     readyObserverCbs.push(cb);
   };
 
-  var notifyStateObservers = function( e ) {
+  srv.regApiReadyObserverCb = function(cb) {
+    apiReadyObserverCbs.push(cb);
+  };
+
+  srv.notifyStateObservers = function( e ) {
     angular.forEach(stateObserverCbs, function(cb) {
       cb( e );
     });
   };
 
-  var notifyReadyObservers = function( e ) {
+  srv.notifyReadyObservers = function( e ) {
     angular.forEach(readyObserverCbs, function(cb) {
       cb( e );
+    });
+  };
+
+  srv.notifyApiReadyObservers = function() {
+    angular.forEach(apiReadyObserverCbs, function(cb) {
+      cb();
     });
   };
 
   // For use with the YouTube API
   srv.onStateChange = function( e ) {
     srv.playerState = e.data;
-    notifyStateObservers( e );
+    srv.notifyStateObservers( e );
   };
 
   // SERVICE PROPERTIES
   srv.playerBuffer = 0;
   srv.playerState = ytConfig.PLAYER_STATE.UNSTARTED;
   srv.playerTime_sec = 0;
+  
+
+
 
   srv.play = function() {
     if (srv.player) {
@@ -114,6 +136,14 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
     }
   };
 
+  srv.updatePlayerState = function() {
+    if (srv.player) {
+      srv.playerState = srv.player.getPlayerState();
+    } else {
+      return ytConfig.PLAYER_STATE.UNSTARTED;
+    }
+  };
+
   srv.getPlayerState = function() {
     if (srv.player) {
       if (srv.player.getPlayerState) {
@@ -122,8 +152,8 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
     }
   };
 
-  var onReady = function( e ) {
-    notifyReadyObservers( e );
+  srv.onReady = function( e ) {
+    srv.notifyReadyObservers( e );
   };
 
   srv.initPlayer = function() {
@@ -132,7 +162,7 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
       height: ytConfig.height,
       playerVars: ytConfig.playerVars,
       events: {
-        'onReady': onReady,
+        'onReady': srv.onReady,
         'onStateChange': srv.onStateChange
       }
     });
@@ -158,7 +188,7 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
 
   // Required by the YouTube API
   // set window.onYouTubeIframeAPIReady to player service.onYouTubeIframeAPIReady
-  window.onYouTubeIframeAPIReady = function() {
+  srv.onYouTubeIframeAPIReady = function() {
     srv.player = srv.initPlayer();
   };
 
@@ -201,30 +231,13 @@ player.factory('ytApi', ['ytConfig', function(ytConfig) {
   return srv;
 }]);
 
-/* app: Module
- * The angular application
+/*
+ *
  */
 var app = angular.module('qTube', ['player', 'ui.sortable']);
 
-/* apiConfig: Value
- * Holds the API URI
- */
-app.value('apiConfig', {
-  baseUri: 'http://qtube.io/api/',
-  queueUri: 'q/'
-});
-
-/* searchConfig: Value
- * Holds the search URIs, values, etc.
- */
-app.value('searchConfig', {
-  resultsPerSearchQuery: 10,
-  suggestionsPerQuery: 5,
-  baseQUrl: 'http://gdata.youtube.com/feeds/videos?alt=json'
-});
-
-/* Jinja2 uses the same bindings as vanilla AngularJS ( {{ and }} )
- * This sets the AngularJS bindings to {[ and ]} to avoid conflict
+/*
+ *
  */
 app.config(['$interpolateProvider', 
   function($interpolateProvider) {
@@ -232,25 +245,8 @@ app.config(['$interpolateProvider',
     $interpolateProvider.endSymbol(']}');
 }]);
 
-/* Here we add a filter for the templates so that we can trim / truncate
- * strings.  When called, it will trim the string and append ellipses.
- */
-angular.module('ng').filter('trim', function() {
-  return function(val, max) {
-    if (!val) return '';
-    max = parseInt(max);
-    if (val.length >= max - 3) {
-      return val.substring(0, ( max - 3 )) + '...';
-    } else {
-      return val;
-    }
-  };
-});
-
-/* objects: Service
- * Holds the application wide objects that we will be using, namely Video 
- * and Queue.  Might be better to have this as a value instead of a service,
- * but it works just fine.
+/*
+ *
  */
 app.factory('objects', function() {
   var Video = function(id, author, title, thumb_url, desc, dur_s, dur_sf) {
@@ -283,11 +279,11 @@ app.factory('objects', function() {
     return obj;
   };
 
-  Video.prototype.setCurrentVideo = function() {
+  Video.prototype.setIndex = function() {
     this.isCurrentVideo = true;
   };
 
-  Video.prototype.setNotCurrentVideo = function() {
+  Video.prototype.setNonIndex = function() {
     this.isCurrentVideo = false;
   };
 
@@ -309,10 +305,6 @@ app.factory('objects', function() {
 
   var Queue = function(videos, videos_dict, currentVideoIndex, playerTime_sec, playing) {
     this.videos = videos;
-    // videos_dict is in reality a JS object / associative array.  I named it
-    // a dictionary because calling it 'videos_obj' isn't very descriptive
-    // videos_dict will have video.ids as the key, and a count as the value.
-    // ie, {'<some_video_id>':2} means 2 videos are in the queue with that id
     this.videos_dict = videos_dict;
     this.currentVideoIndex = currentVideoIndex;
     this.playerTime_sec = playerTime_sec;
@@ -344,7 +336,6 @@ app.factory('objects', function() {
     return JSON.stringify(this.toObj());
   };
 
-  // to be used from parsed Json objects after loading
   Queue.fromObject = function(obj) {
     window.shit = obj;
     var videos = [];
@@ -366,22 +357,22 @@ app.factory('objects', function() {
   };
 });
 
-/* queueService: Service
- * This service holds a queue object, which can be manipulated via setters and
- * getters.  Is utilized by the controller.
+/*
+ *
  */
+// srv is the service which is being returned.  queue is now a property of srv because of a closure issue
 app.factory('queueService', ['objects', 
   function(objects) {
-    // srv == the service which is being returned in this function.
-    // all srv.XXXXX properties are accessible by the controller
     var srv = {};
 
     var indexObserverCbs = [];
     var videosObserverCbs = [];
 
-    // was having a closure issue (I believe) so I made the queue a property of
-    // srv, which is not ideal.  Will investigate.
     srv.queue = new objects.Queue([], {}, -1, 0, false);
+
+    srv.loadQueue = function(queue) {
+      srv.queue = queue;
+    };
 
     srv.regIndexObserverCb = function(cb) {
       indexObserverCbs.push(cb);
@@ -403,52 +394,44 @@ app.factory('queueService', ['objects',
       });
     };
 
-    // sets the 'index' / currentVideo for the queue
     var setIndex = function(new_val) {
       if (srv.queue.currentVideoIndex >= 0) {
         if (srv.queue.videos[srv.queue.currentVideoIndex] !== undefined) {
-          srv.queue.videos[srv.queue.currentVideoIndex].setNotCurrentVideo();
+          srv.queue.videos[srv.queue.currentVideoIndex].setNonIndex();
         }
       }
       srv.queue.currentVideoIndex = new_val;
       
       if (new_val >= 0) {
-        srv.queue.videos[srv.queue.currentVideoIndex].setCurrentVideo();
+        srv.queue.videos[srv.queue.currentVideoIndex].setIndex();
       }
       notifyIndexObservers();
     };
 
-    // returns the length of the queue
     srv.videosLength = function() {
       return srv.queue.videos.length;
     };
 
-    // playing is only really accessed on saves / loads
     srv.playing = function() {
       return srv.queue.playing;
     };
 
-    // setPlaying is only really accessed on saves/loads
     srv.setPlaying = function(playing) {
       srv.queue.playing = playing;
     };
 
-    // returns the current video
     srv.getCurrentVideo = function() {
       return srv.queue.videos[srv.queue.currentVideoIndex];
     };
 
-    // returns the current video's duration in seconds
     srv.getCurrentVideoDuration = function() {
       if (srv.getCurrentVideo() !== undefined) {
         return srv.getCurrentVideo().dur_s;
       }
     };
 
-    // updateIndex is needed for the sortable UI interface.  When the queue
-    // items are dragged around by the user, the indexes of the videos needs
-    // to be updated
     srv.updateIndex = function() {
+      console.log('updateIndex');
       for (var i = 0; i < srv.queue.videos.length; i++) {
         if (srv.queue.videos[i].isCurrentVideo) {
           setIndex(i);
@@ -456,12 +439,10 @@ app.factory('queueService', ['objects',
       }
     };
 
-    // returns true if there is a video after the current video
     srv.hasNext = function() {
       return srv.queue.videos.length > srv.queue.currentVideoIndex + 1;
     };
 
-    // returns true if there is a video before the current video
     srv.hasPrevious = function() {
       return (srv.queue.currentVideoIndex - 1) >= 0;
     };
@@ -470,7 +451,7 @@ app.factory('queueService', ['objects',
       return index >=0 && index < srv.queue.videos.length;
     };
 
-    var getVideoAtIndex = function(index) {
+    srv.get = function(index) {
       if (indexInBounds(index)) {
         return srv.queue.videos[index];
       } else {
@@ -478,7 +459,6 @@ app.factory('queueService', ['objects',
       }
     };
 
-    // makes the video at an index the current video, and returns the video
     srv.changeToIndex = function(index) {
       if (indexInBounds(index)) {
         setIndex(index);
@@ -488,7 +468,6 @@ app.factory('queueService', ['objects',
       }
     };
 
-    // sets the queue index to the next video and returns that video
     srv.next = function() {
       if (srv.hasNext()) {
         setIndex(srv.queue.currentVideoIndex + 1);
@@ -498,7 +477,6 @@ app.factory('queueService', ['objects',
       }
     };
 
-    // sets the queue index to the previous video and returns that video
     srv.previous = function() {
       if (srv.hasPrevious()) {
         setIndex(srv.queue.currentVideoIndex - 1);
@@ -508,7 +486,7 @@ app.factory('queueService', ['objects',
       }
     };
 
-    var incrementVideoDict = function(video) {
+    srv.incrementVideoDict = function(video) {
       if (srv.queue.videos_dict[video.id] !== undefined) {
         srv.queue.videos_dict[video.id] += 1;
       } else {
@@ -516,7 +494,7 @@ app.factory('queueService', ['objects',
       }
     };
 
-    var decrementVideoDict = function(video) {
+    srv.decrementVideoDict = function(video) {
       if (srv.queue.videos_dict[video.id] !== undefined) {
         srv.queue.videos_dict[video.id] -= 1;
         if (srv.queue.videos_dict[video.id] === 0) {
@@ -525,22 +503,16 @@ app.factory('queueService', ['objects',
       }
     };
 
-    // returns true if the video is in the queue (by checking the videos_dict)
     srv.videoInVideos = function(video) {
       return video.id in srv.queue.videos_dict;
     };
 
-    // adds a video to the queue
-    // We use Object.create to make sure that each video is it's own
-    // instantiated obj.  Otherwise, if we play or delete one of many duplicate
-    // videos, then the other duplicate videos will have their properties change
     srv.addVideo = function(video) {
       srv.queue.videos.push( Object.create(video) );
-      incrementVideoDict(video);
+      srv.incrementVideoDict(video);
       notifyVideosObservers();
     };
 
-    // returns the last index of a video in the queue
     srv.lastIndexOfVideo = function(video) {
       if (srv.videoInVideos(video)) {
         for (var i = srv.queue.videos.length - 1; i >= 0; i--) {
@@ -552,79 +524,84 @@ app.factory('queueService', ['objects',
       return -1;
     };
 
-    // removes a video at an index from the queue
+    srv.removeVideo = function(video) {
+      //var index = srv.queue.videos.indexOf(video);
+      if (srv.videoInVideos(video)) {
+        for (var i = srv.queue.videos.length - 1; i >= 0; i--) {
+          if (srv.queue.videos[i].id === video.id) {
+            srv.removeVideoByIndex(i);
+            break;
+          }
+        }
+      }
+    };
+
     srv.removeVideoByIndex = function(index) {
       if (indexInBounds(index)) {
 
-        var videoAtIndex = getVideoAtIndex(index);
+        var videoAtIndex = srv.get(index);
 
         var isCurrentVideo = (index === srv.queue.currentVideoIndex);
         if (isCurrentVideo) {
-          // if there is a next video, the index will not change
           if (!srv.hasNext()) {
             if (srv.hasPrevious()) {
-              // if there is no next video, but there is a previous video, index
-              // will change to current - 1
               setIndex(srv.queue.currentVideoIndex - 1);
             } else {
-              // if there isn't a next or a previous video, then set index to -1
               setIndex(-1);
             }
           }
         }
         
-        decrementVideoDict(videoAtIndex);
-
-        // remove the video from the queue
+        srv.decrementVideoDict(videoAtIndex);
         srv.queue.videos.splice(index, 1);
         
-        // the if statements above will already update the index if the 
-        // index arg === currentVideoIndex but, if a video is removed before the
-        // currentVideoIndex (ie, index !== currentVideoIndex), then we want the
-        // currentVideoIndex to reflect that. For ex, if currentVideoIndex = 1, 
-        // and the index arg = 0, the new currentVideoIndex would then be 0.
+        // the if statements above will already update the index if the index arg === currentVideoIndex
+        // but, if a video is removed before the currentVideoIndex (ie, index !== currentVideoIndex), then we want the currentVideoIndex to reflect that.
+        // For ex, if currentVideoIndex = 1, and the index arg = 0, the currentVideoIndex would then be 0.
         if (!isCurrentVideo) {
           srv.updateIndex();
         }
-
-        // notify the videos observers because we have just altered videos,
-        // note, srv.updateIndex above will already call notifyIndexObservers
         notifyVideosObservers();
       }
     };
 
-    // only used for saving / loading
+    srv.insertVideo = function(video, index) {
+      srv.queue.videos.splice(index, 0, video);
+      srv.incrementVideoDict(video);
+      notifyVideosObservers();
+      notifyIndexObservers();
+    };
+
     srv.setPlayerTime_sec = function(time) {
       srv.queue.playerTime_sec = time;
     };
 
-    // only used for saving / loading
     srv.getPlayerTime_sec = function() {
       return srv.queue.playerTime_sec;
     };
 
-    // returns the videos array of the queue
     srv.getVideos = function() {
       return srv.queue.videos;
     };
 
-    // returns the index of the current video
-    srv.getCurrentVideoIndex = function() {
+    srv.getIndex = function() {
       return srv.queue.currentVideoIndex;
     };
 
-    // uses objects.Queue's toJson function to turn the queue into JSON format
     srv.toJson = function() {
       return srv.queue.toJson();
     };
 
-    // notifies index and videos observers
     var notifyObservers = function() {
       notifyIndexObservers();
       notifyVideosObservers();
     };
 
-    // uses objects.Queue's fromObject function to create a Queue from parsed JSON
+    srv.loadFromJson = function(jsonText) {
+      srv.queue = objects.Queue.fromObject(JSON.parse(jsonText));
+      notifyObservers();
+    };
+
     srv.loadFromObj = function(obj) {
       srv.queue = objects.Queue.fromObject(obj);
       notifyObservers();
@@ -633,16 +610,21 @@ app.factory('queueService', ['objects',
     return srv;
 }]);
 
-/* common: Service
- * Will hold common reused app-wide functions, like throttle
+/*
+ *
+ */
+app.value('searchConfig', {
+  resultsPerSearchQuery: 10,
+  suggestionsPerQuery: 5,
+  baseQUrl: 'http://gdata.youtube.com/feeds/videos?alt=json'
+});
+
+/*
+ *
  */
 app.factory('common', [function() {
   srv = {};
 
-  // throttle makes it so a function can only be called at most once every time
-  // delay.  For ex, if delay is 200ms, the function can only be called once
-  // every 200ms.  After the 200ms is up, the most recent function call will
-  // execute.
   srv.throttle = function(fn, delay) {
     var timer, last;
     return function() {
@@ -663,10 +645,19 @@ app.factory('common', [function() {
   };
 
   return srv;
+
 }]);
 
-/* apiService: Service
- * Handles interacting with the backend API.
+/*
+ *
+ */
+app.value('apiConfig', {
+  baseUri: 'http://qtube.io/api/',
+  queueUri: 'q/'
+});
+
+/*
+ *
  */
 app.factory('apiService', ['$http', 'apiConfig', 
   function($http, apiConfig){
@@ -697,14 +688,12 @@ app.factory('apiService', ['$http', 'apiConfig',
     return srv;
 }]);
 
-/* formats: Service
- * Holds various formatting functions, like 'secondsToHMS' (seconds to Hours, 
- * minutes, seconds), GDATA formatting, etc.
+/*
+ *
  */
 app.factory('formats', ['objects', function(objects) {
   var srv = {};
   
-  // converts a seconds int to 'H:MM:SS' (hours:minutes:seconds) string format
   srv.secondsToHMS = function(seconds) {
     seconds = Math.floor(seconds);
     var hours = Math.floor(seconds / 3600);
@@ -722,7 +711,6 @@ app.factory('formats', ['objects', function(objects) {
 
   };
 
-  // converts data from GData to video objects array
   srv.videosFromGdataEntry = function(entries) {
     var videos = [];
 
@@ -748,7 +736,10 @@ app.factory('formats', ['objects', function(objects) {
     return videos;
   };
 
-  // converts gdata to search suggestions format
+  srv.gdataToSearchSuggestions = function(data) {
+    return srv.videosFromGdataEntry(data.feed.entry);
+  };
+
   srv.gdataToSuggestions = function(data) {
     var new_suggestions = [];
     for (var i in data.feed.entry) {
@@ -757,7 +748,6 @@ app.factory('formats', ['objects', function(objects) {
     return new_suggestions;
   };
 
-  //converts gdata to search results format
   srv.gdataToSearchResults = function(data) {
     window.blah = data;
     var newData = {}; //the object to be returned
@@ -773,165 +763,152 @@ app.factory('formats', ['objects', function(objects) {
 }]);
 
 
-/* suggestionService: Service
- * for making user input suggestions
+/*
+ *
  */
-app.factory('suggestionService', ['$http', 'searchConfig', 'formats', 
-  function($http, searchConfig, formats) {   
-    srv = {};
+// active is to control for the case where the search input has been cleared (inactive)
+// but a request is returned, which would then alter the suggestions to that request returned.
+// we want there to be no search suggestions whatsoever if the input is cleared
+app.factory('suggestionService', ['$http', 'searchConfig', 'formats', 'common', function($http, searchConfig, formats, common) {
+  srv = {};
 
-    var suggestions = [];
-    var mostRecentSuggestionQuery = "";
+  var suggestions = [];
+  var mostRecentSuggestionQuery = "";
+  var active = true;
 
-    // active is to control for the case where the search input has been cleared 
-    // (inactive) but a request is returned, which would then alter the  
-    // suggestions to that request returned. We want there to be no search  
-    // suggestions whatsoever if the input is cleared
-    var active = true;
+  var suggestionsObserverCbs = [];
 
-    var suggestionsObserverCbs = [];
+  srv.regSuggestionsObserver = function( cb ) {
+    suggestionsObserverCbs.push(cb);
+  };
 
-    srv.regSuggestionsObserver = function( cb ) {
-      suggestionsObserverCbs.push(cb);
-    };
+  notifySuggestionsObservers = function() {
+    angular.forEach(suggestionsObserverCbs, function( cb ) {
+      cb();
+    });
+  };
 
-    var notifySuggestionsObservers = function() {
-      angular.forEach(suggestionsObserverCbs, function( cb ) {
-        cb();
-      });
-    };
-
-    // sets the suggestions to the array
-    var setSuggestions = function(query, arr) {
-      if (active) {
-        // to ensure that we are setting the suggestions of only the most recent
-        // suggestion query, we check if the query === mostRecentSuggestionQuery
-        if ( arr.length === 0 || query === mostRecentSuggestionQuery) {
-          suggestions = arr;
-          notifySuggestionsObservers();
-        }
+  srv.setSuggestions = function(query, arr) {
+    if (active) {
+      if ( arr.length === 0 || query === mostRecentSuggestionQuery) {
+        suggestions = arr;
+        notifySuggestionsObservers();
       }
-    };
+    }
+  };
 
-    srv.getSuggestions = function() {
-      return suggestions;
-    };
+  srv.getSuggestions = function() {
+    return suggestions;
+  };
 
-    var generateQUri = function( q ) {
-      return searchConfig.baseQUrl + '&start-index=1&max-results=' + searchConfig.suggestionsPerQuery + "&q=" + q;
-    };
+  var generateQUri = function( q ) {
+    return searchConfig.baseQUrl + '&start-index=1&max-results=' + searchConfig.suggestionsPerQuery + "&q=" + q;
+  };
 
-    // setInactive is to clear the suggestions when the user input is cleared
-    srv.setInactive = function() {
-      setSuggestions('', []);
-      mostRecentSuggestionQuery = "";
-      active = false;
-    };
+  srv.setInactive = function() {
+    srv.setSuggestions('', []);
+    mostRecentSuggestionQuery = "";
+    active = false;
+  };
 
-    // sets active so that suggestions can be set
-    srv.setActive = function() {
-      active = true;
-    };
+  srv.setActive = function() {
+    active = true;
+  };
 
-    var suggestionRequest = function( q ) {
-      return $http.get( generateQUri( q ) )
-        .then( function(res) {
-          return formats.gdataToSuggestions(res.data);
-        });
-    };
+  var suggestionRequest = function( q ) {
+    return $http.get( generateQUri( q ) )
+      .then( function(res) {
+        return formats.gdataToSuggestions(res.data);
+      });
+  };
 
-    // sends a request for suggestions for query q, sets the suggestions on res
-    srv.suggest = function( q ) {
-      mostRecentSuggestionQuery = q;
-      suggestionRequest( q )
-        .then( function(data) {
-          setSuggestions(q, data);
-        });
-    };
+  srv.suggest = function( q ) {
+    mostRecentSuggestionQuery = q;
+    suggestionRequest( q )
+      .then( function(data) {
+        srv.setSuggestions(q, data);
+      });
+  };
 
-    return srv;
+  return srv;
 }]);
 
-/* searchService: service
- * for getting search results from Gdata
+/*
+ *
  */
-app.factory('searchService', ['$http', 'searchConfig', 'formats', 
-  function($http, searchConfig, formats) {
-    srv = {};
+// turn into angular.service
+app.factory('searchService', ['$http', 'searchConfig', 'formats', function($http, searchConfig, formats) {
+  srv = {};
 
-    var searchIndex = 0;
-    var searchTerm = "";
-    var searchResults = [];
+  var searchIndex = 0;
+  var searchTerm = "";
+  var searchResults = [];
 
-    // to ensure that there's only one search at a time
-    var currentlySearching = false;
+  var currentlySearching = false;
 
-    var resultsObserverCbs = [];
+  var resultsObserverCbs = [];
 
-    srv.regResultsObserverCb = function(cb) {
-      resultsObserverCbs.push(cb);
-    };
+  srv.regResultsObserverCb = function(cb) {
+    resultsObserverCbs.push(cb);
+  };
 
-    var notifyResultsObservers = function() {
-      angular.forEach(resultsObserverCbs, function(cb) {
-        cb();
+  var notifyResultsObservers = function() {
+    angular.forEach(resultsObserverCbs, function(cb) {
+      cb();
+    });
+  };
+
+  var pushResults = function(data) {
+    searchResults.push(data);
+    notifyResultsObservers();
+  };
+
+  var generateQUri = function() {
+    var start_index_qs = "&start-index=" + (searchIndex * searchConfig.resultsPerSearchQuery + 1);
+    var max_results_qs = "&max-results=" + searchConfig.resultsPerSearchQuery;
+    var search_qs = "&q=" + escape( searchTerm );
+    return searchConfig.baseQUrl + start_index_qs + max_results_qs + search_qs;
+  };
+
+  var incrementSearchIndex = function() {
+    searchIndex += 1;
+  };
+
+  var getSearchResults = function() {
+    currentlySearching = true;
+    return $http.get( generateQUri() )
+        .then( function(res) {
+          currentlySearching = false;
+          incrementSearchIndex();
+          return formats.gdataToSearchResults(res.data);
+        });
+  };
+
+  srv.results = function() {
+    return searchResults;
+  };
+
+  srv.search = function( q ) {
+    searchTerm = q;
+    searchIndex = 0;
+    searchResults = [];
+
+    getSearchResults()
+      .then( function(data) {
+        pushResults(data);
       });
-    };
+  };
 
-    // used so that results observers are notified
-    var pushResults = function(data) {
-      searchResults.push(data);
-      notifyResultsObservers();
-    };
+  srv.more = function() {
+    if (!currentlySearching) {
+    getSearchResults()
+      .then( function(data) {
+        pushResults(data);
+      });
+    }
+  };
 
-    var generateQUri = function() {
-      var start_index_qs = "&start-index=" + 
-          (searchIndex * searchConfig.resultsPerSearchQuery + 1);
-      var max_results_qs = "&max-results=" + searchConfig.resultsPerSearchQuery;
-      var search_qs = "&q=" + escape( searchTerm );
-      return searchConfig.baseQUrl + start_index_qs + max_results_qs + search_qs;
-    };
-
-    var incrementSearchIndex = function() {
-      searchIndex += 1;
-    };
-
-    var getSearchResults = function() {
-      currentlySearching = true;
-      return $http.get( generateQUri() )
-          .then( function(res) {
-            currentlySearching = false;
-            incrementSearchIndex();
-            return formats.gdataToSearchResults(res.data);
-          });
-    };
-
-    srv.results = function() {
-      return searchResults;
-    };
-
-    srv.search = function( q ) {
-      searchTerm = q;
-      searchIndex = 0;
-      searchResults = [];
-
-      getSearchResults()
-        .then( function(data) {
-          pushResults(data);
-        });
-    };
-
-    // gets more search results using the same query
-    srv.more = function() {
-      if (!currentlySearching) {
-      getSearchResults()
-        .then( function(data) {
-          pushResults(data);
-        });
-      }
-    };
-
-    return srv;
+  return srv;
 }]);
 
 app.controller('AppController', [
@@ -948,26 +925,37 @@ app.controller('AppController', [
   '$location',
   '$interval', 
   function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, $scope, $location, $interval) {
-
+  // For debug, remove in prod
+  window._a = apiService;
+  window._q = queueService;
+  window._ss = suggestionService;
+  window._s = searchService;
+  window._y = ytApi;
+  window._o = objects;
+  window._$ = $scope;
+  window._l = $location;
   var init_app = function() {
     var path_arr = $location.path().split('/').splice(1);
     if (path_arr[0] === 'q') {
       loadQueueFromToken(path_arr[1]);
+    } else {
+      //var first_vid = new objects.Video('Q-iL4P3tvK8', 'VHS Documentaries', 'PBS Nova Tales From the Hive (2000, 2007)', 'null', 'desc', 3232);
+      //queueService.addVideo(first_vid);
     }
   };
 
   ytApi.regReadyObserverCb( init_app );
 
+  $scope.PLAYER_STATE = ytConfig.PLAYER_STATE;
+
   $scope.videos = queueService.getVideos();
-  $scope.currentVideoIndex = queueService.getCurrentVideoIndex();
+  $scope.currentVideoIndex = queueService.getIndex();
   $scope.currentVideo = {'dur_sf': '0:00:00'};
 
   $scope.playing = false;
   $scope.searchText = "";
 
   $scope.searchFocus = false;
-
-  $scope.mouseOverSuggestions = false;
   $scope.mouseOverProgressBar = false;
 
   $scope.playerState = ytApi.playerState;
@@ -985,17 +973,24 @@ app.controller('AppController', [
   };
 
   var changePathTo = function(path) {
-    $location.path(path);
+    //$scope.$apply( 
+      $location.path(path);
+    //);
   };
 
-  var getPlayerBufferPct = function() {
+  var appendToPath = function(path) {
+    $scope.$apply( $location.path( $location.path() + path) );
+  };
+
+  var playerBufferPct = function() {
     return ytApi.getBufferPct();
   };
 
-  // converts video progress in sec to percent, to be used on progress bar
+  // debug
   var playerProgressPct = function() {
+    //var currentVideo = queueService.getCurrentVideo();
     if ($scope.currentVideo) {
-      if (ytApi.getPlayerState() === ytConfig.PLAYER_STATE.ENDED) {
+      if (ytApi.getPlayerState() === $scope.PLAYER_STATE.ENDED) {
         return 100;
       } else {
         return ((ytApi.getProgressSec() / $scope.currentVideo.dur_s) * 100);
@@ -1005,13 +1000,11 @@ app.controller('AppController', [
     }
   };
 
-  // converts the progress in sec to HMS format (H:MM:SS)
   var playerTime_HMS = function() {
     return formats.secondsToHMS( ytApi.getProgressSec() || 0 );
   };
 
-  // converts percent of video duration to seconds.
-  // To be used with ytApi's seekTo function
+  // is pct a float or digit ( x / 100 ) ?
   var playerPctToSec = function(pct) {
     //var currentVideo = queueService.getCurrentVideo();
     if ($scope.currentVideo) {
@@ -1021,14 +1014,14 @@ app.controller('AppController', [
     }
   };
 
-  // converts percent of video duration to HMS format.  For displaying
-  // the progress bar mouseover time
   var percentToHMS = function(pct) {
     return formats.secondsToHMS( playerPctToSec(pct) );
   };
 
-  // gets the most current values for player progress and buffer
-  // used for the progress bar
+  $scope.playerPctToHMS = function(pct) {
+    return (formats.secondsToHMS( playerPctToSec(pct) ));
+  };
+
   var updateProgressAndBufferPct = function() {
     $scope.playerProgressPct = playerProgressPct();
 
@@ -1036,36 +1029,43 @@ app.controller('AppController', [
       $scope.playerTime_HMS = playerTime_HMS();
     }
 
-    $scope.playerBufferPct = getPlayerBufferPct();
+    $scope.playerBufferPct = playerBufferPct();
   };
 
-  // interval to update the values for progress and buffer bars
   $interval( updateProgressAndBufferPct, 100 );
 
-  // for ytApi.  After player is loaded it will call this
+  window.onYouTubeIframeAPIReady = function() {
+    ytApi.onYouTubeIframeAPIReady();
+  };
+
+  var updatePlayerStatusBarModels = function() {
+
+  };
+
   var onPlayerReady = function() {
     if ($scope.playing) {
       ytApi.play();
     }
   };
 
-  // gets the most recent values for the player state
   var updatePlayerState = function() {
+    console.log('update player state');
+    
     // if the user pauses the video via YouTube (and not our UI) we want to 
     // make sure to update $scope.playing to match that
-    if (ytApi.playerState === ytConfig.PLAYER_STATE.PLAYING) {
+    if (ytApi.playerState === $scope.PLAYER_STATE.PLAYING) {
       $scope.playing = true;
     }
-    else if (ytApi.playerState === ytConfig.PLAYER_STATE.PAUSED) {
+    else if (ytApi.playerState === $scope.PLAYER_STATE.PAUSED) {
       $scope.playing = false;
     }
 
-    else if (ytApi.playerState === ytConfig.PLAYER_STATE.ENDED) {
-      // stupid thing; only way to know if there is a transition is because it 
-      // goes from paused -> ended. but, a video could end and then be left
-      // that way (if a person wanted it to be that way), so the only way to
-      // check is to see if it was previously paused
-      if (queueService.hasNext() && $scope.playerState === ytConfig.PLAYER_STATE.PAUSED) {
+    else if (ytApi.playerState === $scope.PLAYER_STATE.ENDED) {
+      console.log('ended');
+      // stupid thing; only way to know if there is a transition is because it goes from paused -> ended.
+      // but, a movie could end and then be left that way (if a person wanted it to be that way), so the only
+      // way to check is to see if it was previously paused
+      if (queueService.hasNext() && $scope.playerState === $scope.PLAYER_STATE.PAUSED) {
         $scope.playing = true;
         $scope.next();
       } else {
@@ -1077,41 +1077,33 @@ app.controller('AppController', [
     $scope.$apply();
   };
 
-  // gets most recent value for videos
   var updateVideos = function() {
     $scope.videos = queueService.getVideos();
   };
 
-  // gets most recent value for search results
   var updateSearchResults = function() {
     $scope.searchResults = searchService.results();
   };
 
-  // gets most recent value for currentVideo and currentVideoIndex
-  var updateCurrentVideoIndex = function() {
-    $scope.currentVideoIndex = queueService.getCurrentVideoIndex();
+  var updateIndex = function() {
+    $scope.currentVideoIndex = queueService.getIndex();
     $scope.currentVideo = queueService.getCurrentVideo();
   };
 
-  // gets most recent value for search suggestions
   var updateSearchSuggestions = function() {
     $scope.searchSuggestions = suggestionService.getSuggestions();
   };
 
-  // OBSERVERS
-  // registers observers with the various services to ensure that the controller
-  // has the most up to date values
   ytApi.regStateObserverCb(updatePlayerState);
   ytApi.regReadyObserverCb(onPlayerReady);
 
   queueService.regVideosObserverCb(updateVideos);
-  queueService.regIndexObserverCb(updateCurrentVideoIndex);
+  queueService.regIndexObserverCb(updateIndex);
 
   searchService.regResultsObserverCb(updateSearchResults);
 
   suggestionService.regSuggestionsObserver(updateSearchSuggestions);
 
-  // loads a queue given a token.  Is used when loading the app
   var loadQueueFromToken = function(token) {
     apiService.getQueueDataObj(token)
         .then( function(obj) {
@@ -1120,9 +1112,6 @@ app.controller('AppController', [
         });
   };
 
-  // once a queue is loaded from Json / data, we need to sync the queue with
-  // the player.  Ie, if the app should be playing a certain video, we need
-  // to play that video.
   var syncWithQueue = function() {
     if (queueService.getCurrentVideo() !== undefined) {
       if (queueService.playing()) {
@@ -1135,23 +1124,17 @@ app.controller('AppController', [
     }
   };
 
-  // saves the queue data
   $scope.saveQueue = function() {
-    // set values so that they are most up to date
     ytApi.updatePlayerTime_sec();
     queueService.setPlayerTime_sec( ytApi.playerTime_sec );
     queueService.setPlaying( $scope.playing );
-
-    // use the apiService to post data
-    apiService.postQueueDataJson( queueService.toJson() )
+    apiService.postQueueDataJson( queueService.queue.toJson() )
         .then( function(token) {
-          // once save is complete, update the path to include the data's token
           setQueuePath(token);
         });
   };
 
-  // from ytApi: load = load video and play, cue = load video and pause
-  var loadOrCue = function(video) {
+  $scope.loadOrCue = function(video) {
     if ($scope.playing) {
       ytApi.load(video);
     } else {
@@ -1159,10 +1142,8 @@ app.controller('AppController', [
     }
   };
 
-  // removes a video from the queue by index
+  // if we are removing the currently played video, then we need to 
   $scope.removeVideoInQueue = function(index, $event) {
-    // AngularJS will propagate events too far, so we need to stop them
-    // from bubbling or propagating
     if ($event) {
       if ($event.stopPropagation) $event.stopPropagation();
       if ($event.preventDefault) $event.preventDefault();
@@ -1170,48 +1151,42 @@ app.controller('AppController', [
       $event.returnValue = false;
     }
 
-    // if we are removing the current video
     if (index === $scope.currentVideoIndex) {
       queueService.removeVideoByIndex(index);
-      if (queueService.getCurrentVideoIndex() === -1) {
-        loadOrCue( "" ); // queue is now empty
+      if (queueService.getIndex() === -1) {
+        $scope.loadOrCue( "" );
       } else {
-        loadOrCue( queueService.getCurrentVideo() );
+        $scope.loadOrCue( queueService.getCurrentVideo() );
       }
     } else {
       queueService.removeVideoByIndex(index);
     }
 
-    // if the queue is now empty, load "" so that the player will clear
     if ($scope.videos.length === 0) {
-      loadOrCue( "" );
+      $scope.loadOrCue( "" );
     }
   };
 
-  // for the player controls; plays previous video
   $scope.previous = function( e ) {
     var prev = queueService.previous();
     if (prev) {
-      loadOrCue( prev );
+      $scope.loadOrCue(prev);
     }
   };
 
-  // for the player controls; plays next video
   $scope.next = function( e ) {
     var next = queueService.next();
     if (next) {
-      loadOrCue( next );
+      $scope.loadOrCue(next);
     }
   };
 
-  // for the player controls; plays if paused, pauses if playing
   $scope.play_pause = function( e ) {
     if ($scope.playing) {
       $scope.playing = false;
       ytApi.pause();
     } else {
       $scope.playing = true;
-      // if the queue is unstarted, play next
       if ($scope.currentVideoIndex === -1) {
         $scope.next();
       } else {
@@ -1220,12 +1195,10 @@ app.controller('AppController', [
     }
   };
 
-  // returns true if the video is in the queue
   $scope.videoInVideos = function(video) {
     return queueService.videoInVideos(video);
   };
 
-  // basically loadOrCue but with an index
   $scope.setIndexTo = function(index, $event) {
     if ($event) {
       if ($event.stopPropagation) $event.stopPropagation();
@@ -1241,7 +1214,6 @@ app.controller('AppController', [
     }
   };
 
-  // loads the video at the index / makes that video the current video
   $scope.loadVideoAtIndex = function(index, $event) {
     if ($event) {
       if ($event.stopPropagation) $event.stopPropagation();
@@ -1252,12 +1224,10 @@ app.controller('AppController', [
     ytApi.load( queueService.changeToIndex(index) );
   };
 
-  // cues the video at the index / makes that video the current video
   $scope.cueVideoAtIndex = function(index) {
     ytApi.cue( queueService.changeToIndex(index) );
   };
 
-  // adds the video to the queue
   $scope.addVideo = function(video, $event) {
     if ($event) {
       if ($event.stopPropagation) $event.stopPropagation();
@@ -1269,17 +1239,11 @@ app.controller('AppController', [
     queueService.addVideo(video);
   };
 
-  // adds the video to the queue and plays the last video in the queue, which
-  // should be the video we just added
   $scope.addAndPlayVideo = function(video, $event) {
     $scope.addVideo(video, $event);
-    // the video has been added to the end, so to play we load it from the end
     $scope.loadVideoAtIndex( queueService.videosLength() - 1 );
   };
 
-  // knowing the X offset of the mouse cursor over the progress bar, we can
-  // convert that to the progress time in seconds.  This seek time will take
-  // the place of the normal player time
   $scope.displaySeekTime = function($event) {
     $scope.mouseOverProgressBar = true;
     if (queueService.getCurrentVideoDuration() !== undefined) {
@@ -1287,21 +1251,18 @@ app.controller('AppController', [
     } else {
       $scope.playerTime_HMS = formats.secondsToHMS( 0 );
     }
+
   };
 
-  // displays the normal player time
+  $scope.seekToFromEvent = function($event) {
+    ytApi.seekTo(queueService.getCurrentVideoDuration() * ($event.offsetX / $event.currentTarget.scrollWidth));
+  };
+
   $scope.hideSeekTime = function() {
     $scope.playerTime_HMS = playerTime_HMS();
     $scope.mouseOverProgressBar = false;
   };
 
-  // converts event x coordinate to percentage to a time in seconds and uses
-  // the ytApi to seek to that time
-  $scope.seekToFromEvent = function($event) {
-    ytApi.seekTo(queueService.getCurrentVideoDuration() * ($event.offsetX / $event.currentTarget.scrollWidth));
-  };
-
-  // removes the video from the queue
   $scope.removeVideo = function(video, $event) {
     if ($event) {
       if ($event.stopPropagation) $event.stopPropagation();
@@ -1313,13 +1274,11 @@ app.controller('AppController', [
     $scope.removeVideoInQueue( queueService.lastIndexOfVideo(video) );
   };
 
-  // conducts a suggestion search (ie, user clicks on a suggestion)
   $scope.suggestSearch = function(suggestionText) {
     $scope.searchText = suggestionText;
     $scope.search();
   };
 
-  // conducts a search
   $scope.search = function() {
     $scope.searchSuggestions = [];
     suggestionService.setInactive();
@@ -1327,8 +1286,6 @@ app.controller('AppController', [
     searchService.search($scope.searchText);
   };
 
-  // will limit the get requests to once every 200ms.
-  // the most recent user input will send the request (doesnt block most recent input)
   var throttledGetSuggestions = common.throttle(function() {
     suggestionService.setActive();
     suggestionService.suggest($scope.searchText);
@@ -1342,11 +1299,8 @@ app.controller('AppController', [
     }
   };
 
-  // Show the suggestions if there are suggestions, and if the mouse is over the
-  // suggestions box or the search box has focus
-  $scope.shouldShowSuggestions = function() {
-    return ($scope.searchSuggestions.length > 0 && 
-      ($scope.searchFocus || $scope.mouseOverSuggestions ));
+  $scope.loadDataWithToken = function(token) {
+    
   };
 
   // Part of AngularUI's 'draggable' wrapper.  This call back will make it so
@@ -1357,25 +1311,41 @@ app.controller('AppController', [
     }
   };
 
-  jQuery(document).ready( function() {
-    // windowLoadStart is a constant which will affect the dynamic loading.
-    var windowLoadStart = screen.height * 0.0;
 
-    // Simple jQuery function checks to see if the browser window is at the bottom
-    // of the page.  If the browser window is at the bottom of the page, then
-    // it will load more search results.
-    $(window).scroll(function(){ 
-      // checks to see if the window is currently at the bottom of the content
-      if ( ($(window).scrollTop() >= 
-          ($(document).height() - screen.height + windowLoadStart)) &&
-          $scope.searchResults.length > 0) { 
-        searchService.more();
-      }
-    });
+jQuery(document).ready( function() {
+  // windowLoadStart is a number which will affect the dynamic loading.
+  // Currently this var is set so that loadMoreSearchResults will be called
+  // when the window is .3 window height above the bottom of the document.
+  var windowLoadStart = screen.height * 0.0;
+
+  // Simple jQuery function checks to see if the browser window is at the bottom
+  // of the page.  If the browser window is at the bottom of the page, then
+  // using the globalLoadMoreSearchResults function, will load more results.
+  $(window).scroll(function(){ 
+    // checks to see if the window is currently at the bottom of the content
+    if ( ($(window).scrollTop() >= 
+        ($(document).height() - screen.height + windowLoadStart)) &&
+        $scope.searchResults.length > 0) { 
+      searchService.more();
+    }
   });
+});
+
+
+$scope.shouldShowSuggestions = function() {
+  return ($scope.searchSuggestions.length > 0 && $scope.searchFocus);
+};
+
+// wayyyyy not worth the effort to do this the right way
+$scope.stupidHack = function() {
+  setTimeout( function() {
+    $scope.searchFocus = false;
+  }, 50);
+};
+
+
 }]);
 
-// DIRECTIVES
 app.directive('qtQueue', function() {
   return {
     restrict: 'E',
@@ -1391,9 +1361,9 @@ app.directive('qtQueue', function() {
           '<div class="queue-item" ng-click="loadVideoAtIndex($index, $event)" ng-class="{\'current-video\': video.isCurrentVideo}" ng-repeat="video in videos track by $index">' +
             '<h3 title="{[ video.title ]}" class="queue-item-title">{[ video.title | trim:55 ]}</h3>' +
             '<div class="queue-button-wrap">' +
-              '<div title="Remove" class="queue-button remove" ng-click="removeVideoInQueue($index, $event)"></div>' +
-              '<div title="Play" class="queue-button play" ng-click="loadVideoAtIndex($index, $event)"></div>' +
-              '<div title="Jump To Video" class="queue-button set-index" ng-click="setIndexTo($index, $event)"></div>' +
+              '<div title="remove" class="queue-button remove" ng-click="removeVideoInQueue($index, $event)"></div>' +
+              '<div title="play" class="queue-button play" ng-click="loadVideoAtIndex($index, $event)"></div>' +
+              '<div title="make current video" class="queue-button set-index" ng-click="setIndexTo($index, $event)"></div>' +
             '</div>' +
           '</div>\n' +
         '</div>\n' +
@@ -1406,10 +1376,11 @@ player.directive('qtPlayer', function() {
   return {
     restrict: 'E',
     replace: true,
+    transclude: true,
     template: '<div id="' + playerId + '"></div>'
   };
 });
-// found a bug; sometimes the gdata info has the incorrect time amount.  simple solution is to mod 101 to make sure width never exceeds 100%.  Need a better solution, maybe if the pct is greater than 100 then get new gdata.
+
 app.directive('qtPlayerProgressBar', function() {
   return {
     restrict: 'E',
@@ -1417,8 +1388,8 @@ app.directive('qtPlayerProgressBar', function() {
     template: (
       '<div>' +
       '<div id="player-progress-bar" ng-mousemove="displaySeekTime($event)" ng-mouseleave="hideSeekTime()" ng-click="seekToFromEvent($event)">\n' +
-        '<div class="player-progress" style="width:{[playerProgressPct % 101]}%"></div>' +
-        '<div class="player-buffer" style="width:{[playerBufferPct % 101]}%"></div>' +
+        '<div class="player-progress" style="width:{[playerProgressPct]}%"></div>' +
+        '<div class="player-buffer" style="width:{[playerBufferPct]}%"></div>' +
       '</div>' +
       '<div class="player-time-wrap">' +
         '<div ng-class="mouseOverProgressBar ? \'progress-hover\' : \'\'" class="player-time current">{[ playerTime_HMS ]}</div>' +
@@ -1450,9 +1421,9 @@ app.directive('qtSearchBar', function() {
     template: (
       '<div id="search-wrap">' +
       '<form ng-submit="search()">' +
-      '<input ng-focus="searchFocus = true;" type="text" class="search-bar" ng-change="newSuggestions()" ng-model="searchText" autofocus/>' +
+      '<input ng-focus="searchFocus = true;" ng-blur="stupidHack()" type="text" class="search-bar" ng-change="newSuggestions()" ng-model="searchText" autofocus/>' +
       '<input type="submit" value="Search" class="search-bar-button" />' +
-      '<ul ng-mouseover="mouseOverSuggestions = true" ng-mouseleave="mouseOverSuggestions = false" ng-show="shouldShowSuggestions()" class="search-suggestions">' +
+      '<ul ng-click="searchFocus = true;" ng-show="shouldShowSuggestions()" class="search-suggestions">' +
       '<li class="search-suggestion" ng-click="suggestSearch(suggestion)" ng-repeat="suggestion in searchSuggestions track by $index">{[ suggestion | trim:60 ]}</li>' +
       '</form></div>'
     )
@@ -1479,3 +1450,30 @@ app.directive('qtSearchResults', function() {
     )
   };
 });
+
+angular.module('ng').filter('trim', function() {
+  return function(val, max) {
+    if (!val) return '';
+    max = parseInt(max);
+    if (val.length >= max - 3) {
+      return val.substring(0, ( max - 3 )) + '...';
+    } else {
+      return val;
+    }
+  };
+});
+
+/*
+vid1 = new _o.Video('12345', 'auth', 'title1', 'thumb_url', 'description1', 120);
+vid2 = new _o.Video('12346', 'auth', 'title2', 'thumb_url', 'description1', 120);
+vid3 = new _o.Video('12346', 'auth', 'title3', 'thumb_url', 'description1', 120);
+vid4 = new _o.Video('12346', 'auth', 'title4', 'thumb_url', 'description1', 120);
+vid5 = new _o.Video('12346', 'auth', 'title5', 'thumb_url', 'description1', 120);
+vid6 = new _o.Video('12346', 'auth', 'title6', 'thumb_url', 'description1', 120);
+_q.addVideo(vid1);
+_q.addVideo(vid2);
+_q.addVideo(vid3);
+_q.addVideo(vid4);
+_q.addVideo(vid5);
+_q.addVideo(vid6);
+*/

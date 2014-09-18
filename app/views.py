@@ -1,18 +1,32 @@
-from flask import render_template, session
-from models import Nonce
+from flask import render_template, session, request
+from models import Data, data_token
 from app import app, db
-import os
+import os, binascii
 
 @app.route('/')
-def index():
-    if 'token' in session:
-        token = session['token']
-    else:
-        nonce = Nonce()
-        add_to_db(nonce)
-        token = nonce.token
-        session['token'] = token
-    return render_template('index.html', token=token)
+def appView(path=None):
+    return render_template('app.html')
+
+@app.route('/api/q/', methods=['POST'])
+def queue_post():
+    token = data_token()
+
+    # To ensure that each token is unique; if there a Data which has this token,
+    # then regen the token
+    while Data.with_token(token):
+        token = data_token()
+
+    add_to_db(Data(token=token, value=request.get_data()))
+    return token, 200
+
+# set up later for a subdomain (ie, api.qtube.com).  Will require a second flask instance
+@app.route('/api/q/<token>/', methods=['GET'])
+def queue_item(token):
+    print 'get /api/q/<token>'
+    data = Data.with_token(token)
+    if data:
+        return data.value, 200
+    return '', 404
 
 def add_to_db(mdl):
     db.session.add(mdl)

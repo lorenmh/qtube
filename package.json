@@ -1,6 +1,6 @@
 {
   "name": "qtube",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "repository": "https://github.com/lorenmh/qtube",
   "description": "qtube is an app for queueing YouTube videos",
   "devDependencies": {

@@ -3,7 +3,11 @@ import os, binascii, hashlib
 
 Model, Column, Integer, String, Text = db.Model, db.Column, db.Integer, db.String, db.Text
 
+""" Length needs to be an even number
 """
+def create_token(length):
+    return binascii.b2a_hex(os.urandom(int(length / 2)))
+
 class Nonce(Model):
     __tablename__ = "nonce"
     id = Column(Integer, primary_key=True)
@@ -20,32 +24,19 @@ class Nonce(Model):
     @staticmethod
     def with_token(tkn):
         return Nonce.query.filter_by(token=tkn).first()
-"""
-
-def data_token():
-    return create_token(6)
-
-# Length needs to be an even number
-def create_token(length):
-    return binascii.b2a_hex(os.urandom(int(length / 2)))
 
 class Data(Model):
     __tablename__ = "data"
     id = Column(Integer, primary_key=True)
 
     token = Column(String(6), unique=True)
-    value = Column(Text)
+    data = Column(Text)
 
-    @staticmethod
-    def with_token(tkn):
-        return Data.query.filter_by(token=tkn).first()
-
-    def __init__(self, token, value):
-        super(Model, self).__init__()
-        self.value = value
+    def __init__(self, token, data):
+        super(Base, self).__init__()
+        self.data = data
         self.token = token
 
-"""
 class User(Model):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True)
@@ -70,4 +61,3 @@ class User(Model):
 
     def matches_password(self, str):
         return self.password == self.hash_password(str)
-"""
