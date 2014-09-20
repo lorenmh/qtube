@@ -1206,16 +1206,18 @@ app.controller('AppController', [
 
   // for the player controls; plays if paused, pauses if playing
   $scope.play_pause = function( e ) {
-    if ($scope.playing) {
-      $scope.playing = false;
-      ytApi.pause();
-    } else {
-      $scope.playing = true;
-      // if the queue is unstarted, play next
-      if ($scope.currentVideoIndex === -1) {
-        $scope.next();
+    if (queueService.videosLength() > 0) {
+      if ($scope.playing) {
+        $scope.playing = false;
+        ytApi.pause();
       } else {
-        ytApi.play();
+        $scope.playing = true;
+      // if the queue is unstarted, play next
+        if ($scope.currentVideoIndex === -1) {
+          $scope.next();
+        } else {
+          ytApi.play();
+        }
       }
     }
   };
