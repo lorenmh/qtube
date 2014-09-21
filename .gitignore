@@ -2,3 +2,4 @@ qtube.sock
 uwsgi/
 env/
 *.pyc
+.sass-cache/
