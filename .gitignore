@@ -1,2 +1,4 @@
 qtube.sock
 uwsgi/
+env/
+*.pyc
