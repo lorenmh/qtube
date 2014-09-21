@@ -1,2 +1,3 @@
 qtube.sock
 uwsgi/
+env/

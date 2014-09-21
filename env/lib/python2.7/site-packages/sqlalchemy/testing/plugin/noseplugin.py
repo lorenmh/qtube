@@ -1,5 +1,6 @@
 # plugin/noseplugin.py
-# Copyright (C) 2005-2014 the SQLAlchemy authors and contributors <see AUTHORS file>
+# Copyright (C) 2005-2014 the SQLAlchemy authors and contributors
+# <see AUTHORS file>
 #
 # This module is part of SQLAlchemy and is released under
 # the MIT License: http://www.opensource.org/licenses/mit-license.php
@@ -12,15 +13,21 @@ way (e.g. as a package-less import).
 """
 
 import os
+import sys
 
 from nose.plugins import Plugin
 fixtures = None
 
 # no package imports yet!  this prevents us from tripping coverage
 # too soon.
-import imp
 path = os.path.join(os.path.dirname(__file__), "plugin_base.py")
-plugin_base = imp.load_source("plugin_base", path)
+if sys.version_info >= (3, 3):
+    from importlib import machinery
+    plugin_base = machinery.SourceFileLoader(
+        "plugin_base", path).load_module()
+else:
+    import imp
+    plugin_base = imp.load_source("plugin_base", path)
 
 
 class NoseSQLAlchemy(Plugin):
@@ -70,20 +77,20 @@ class NoseSQLAlchemy(Plugin):
 
     def beforeTest(self, test):
         plugin_base.before_test(test,
-                        test.test.cls.__module__,
-                        test.test.cls, test.test.method.__name__)
+                                test.test.cls.__module__,
+                                test.test.cls, test.test.method.__name__)
 
     def afterTest(self, test):
         plugin_base.after_test(test)
 
     def startContext(self, ctx):
         if not isinstance(ctx, type) \
-            or not issubclass(ctx, fixtures.TestBase):
+                or not issubclass(ctx, fixtures.TestBase):
             return
         plugin_base.start_test_class(ctx)
 
     def stopContext(self, ctx):
         if not isinstance(ctx, type) \
-            or not issubclass(ctx, fixtures.TestBase):
+                or not issubclass(ctx, fixtures.TestBase):
             return
         plugin_base.stop_test_class(ctx)

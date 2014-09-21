@@ -210,7 +210,7 @@ var app = angular.module('qTube', ['player', 'ui.sortable']);
  * Holds the API URI
  */
 app.value('apiConfig', {
-  baseUri: 'http://qtube.io/api/',
+  baseUri: 'http://127.0.0.1:5000/api/',
   queueUri: 'q/'
 });
 
@@ -934,6 +934,51 @@ app.factory('searchService', ['$http', 'searchConfig', 'formats',
     return srv;
 }]);
 
+app.factory('websocket', [function() {
+  srv = {};
+  var playPause, next, prev;
+
+  srv.setPlayPause = function(fn) {
+    playPause = fn;
+  }
+
+  srv.setNext = function(fn) {
+    next = fn;
+  }
+
+  srv.setPrev = function(fn) {
+    prev = fn;
+  }
+
+  var uri_split = location.origin.split(':');
+  uri_split[0] = "ws";
+  var uri = uri_split.join(':') + '/vsock';
+  var ws = new WebSocket(uri)
+  
+  srv.registerId = function(id) {
+    console.log('register')
+    ws.send('{"register":"' + id + '"}');
+  };
+
+  ws.onmessage = function(m) {
+    console.log('onmessage');
+    console.log(m);
+    var msg = JSON.parse(m.data);
+    console.log(msg);
+    if (msg.emit) {
+      if (msg.emit == 'play_pause') {
+        playPause();
+      } else if (msg.emit == 'next') {
+        next();
+      } else if (msg.emit == 'prev') {
+        prev();
+      }
+    }
+  };
+
+  return srv;
+}]);
+
 app.controller('AppController', [
   'apiService',
   'queueService', 
@@ -944,10 +989,14 @@ app.controller('AppController', [
   'formats', 
   'ytApi',
   'ytConfig',
+  'websocket',
   '$scope',
   '$location',
   '$interval', 
-  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, $scope, $location, $interval) {
+  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, websocket, $scope, $location, $interval) {
+
+  _$ = $scope;
+  _w = websocket;
 
   var init_app = function() {
     var path_arr = $location.path().split('/').splice(1);
@@ -1117,6 +1166,7 @@ app.controller('AppController', [
         .then( function(obj) {
           queueService.loadFromObj(obj);
           syncWithQueue();
+          websocket.registerId(token);
         });
   };
 
@@ -1147,6 +1197,7 @@ app.controller('AppController', [
         .then( function(token) {
           // once save is complete, update the path to include the data's token
           setQueuePath(token);
+          websocket.registerId(token);
         });
   };
 
@@ -1221,6 +1272,10 @@ app.controller('AppController', [
       }
     }
   };
+
+  websocket.setPlayPause($scope.play_pause);
+  websocket.setNext($scope.next);
+  websocket.setPrev($scope.previous);
 
   // returns true if the video is in the queue
   $scope.videoInVideos = function(video) {

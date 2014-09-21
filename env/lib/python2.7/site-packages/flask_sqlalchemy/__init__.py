@@ -5,7 +5,7 @@
 
     Adds basic SQLAlchemy support to your application.
 
-    :copyright: (c) 2012 by Armin Ronacher, Daniel Neuhäuser.
+    :copyright: (c) 2014 by Armin Ronacher, Daniel Neuhäuser.
     :license: BSD, see LICENSE for more details.
 """
 from __future__ import with_statement, absolute_import
@@ -23,7 +23,7 @@ from operator import itemgetter
 from threading import Lock
 from sqlalchemy import orm, event
 from sqlalchemy.orm.exc import UnmappedClassError
-from sqlalchemy.orm.session import Session
+from sqlalchemy.orm.session import Session as SessionBase
 from sqlalchemy.event import listen
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.declarative import declarative_base, DeclarativeMeta
@@ -40,6 +40,9 @@ try:
     from flask import _app_ctx_stack
 except ImportError:
     _app_ctx_stack = None
+
+
+__version__ = '2.0'
 
 
 # Which stack should we use?  _app_ctx_stack is new in 0.9
@@ -130,14 +133,31 @@ def _calling_context(app_path):
     return '<unknown>'
 
 
-class _SignallingSession(Session):
+class SignallingSession(SessionBase):
+    """The signalling session is the default session that Flask-SQLAlchemy
+    uses.  It extends the default session system with bind selection and
+    modification tracking.
 
-    def __init__(self, db, autocommit=False, autoflush=False, **options):
+    If you want to use a different session you can override the
+    :meth:`SQLAlchemy.create_session` function.
+
+    .. versionadded:: 2.0
+    """
+
+    def __init__(self, db, autocommit=False, autoflush=True, **options):
+        #: The application that this session belongs to.
         self.app = db.get_app()
         self._model_changes = {}
-        Session.__init__(self, autocommit=autocommit, autoflush=autoflush,
-                         bind=db.engine,
-                         binds=db.get_binds(self.app), **options)
+        #: A flag that controls whether this session should keep track of
+        #: model modifications.  The default value for this attribute
+        #: is set from the ``SQLALCHEMY_TRACK_MODIFICATIONS`` config
+        #: key.
+        self.emit_modification_signals = \
+            self.app.config['SQLALCHEMY_TRACK_MODIFICATIONS']
+        bind = options.pop('bind', None) or db.engine
+        SessionBase.__init__(self, autocommit=autocommit, autoflush=autoflush,
+                             bind=bind,
+                             binds=db.get_binds(self.app), **options)
 
     def get_bind(self, mapper, clause=None):
         # mapper is None if someone tries to just get a connection
@@ -147,31 +167,37 @@ class _SignallingSession(Session):
             if bind_key is not None:
                 state = get_state(self.app)
                 return state.db.get_engine(self.app, bind=bind_key)
-        return Session.get_bind(self, mapper, clause)
+        return SessionBase.get_bind(self, mapper, clause)
 
 
 class _SessionSignalEvents(object):
 
     def register(self):
-        listen(Session, 'before_commit', self.session_signal_before_commit)
-        listen(Session, 'after_commit', self.session_signal_after_commit)
-        listen(Session, 'after_rollback', self.session_signal_after_rollback)
+        listen(SessionBase, 'before_commit', self.session_signal_before_commit)
+        listen(SessionBase, 'after_commit', self.session_signal_after_commit)
+        listen(SessionBase, 'after_rollback', self.session_signal_after_rollback)
 
     @staticmethod
     def session_signal_before_commit(session):
+        if not isinstance(session, SignallingSession):
+            return
         d = session._model_changes
         if d:
             before_models_committed.send(session.app, changes=d.values())
 
     @staticmethod
     def session_signal_after_commit(session):
+        if not isinstance(session, SignallingSession):
+            return
         d = session._model_changes
         if d:
-            models_committed.send(session.app, changes=d.values())
+            models_committed.send(session.app, changes=list(d.values()))
             d.clear()
 
     @staticmethod
     def session_signal_after_rollback(session):
+        if not isinstance(session, SignallingSession):
+            return
         session._model_changes.clear()
 
 
@@ -197,7 +223,7 @@ class _MapperSignalEvents(object):
     @staticmethod
     def _record(mapper, target, operation):
         s = orm.object_session(target)
-        if isinstance(s, _SignallingSession):
+        if isinstance(s, SignallingSession) and s.emit_modification_signals:
             pk = tuple(mapper.primary_key_from_instance(target))
             s._model_changes[pk] = (target, operation)
 
@@ -227,9 +253,9 @@ class _EngineDebuggingSignalEvents(object):
             if queries is None:
                 queries = []
                 setattr(ctx, 'sqlalchemy_queries', queries)
-            queries.append( _DebugQueryTuple( (
+            queries.append(_DebugQueryTuple((
                 statement, parameters, context._query_start_time, _timer(),
-                _calling_context(self.app_package) ) ) )
+                _calling_context(self.app_package))))
 
 
 def get_debug_queries():
@@ -479,7 +505,7 @@ class _EngineConnector(object):
 
 
 def _defines_primary_key(d):
-    """Figures out if the given dictonary defines a primary key column."""
+    """Figures out if the given dictionary defines a primary key column."""
     return any(v.primary_key for k, v in iteritems(d)
                if isinstance(v, sqlalchemy.Column))
 
@@ -565,7 +591,7 @@ class SQLAlchemy(object):
 
     The difference between the two is that in the first case methods like
     :meth:`create_all` and :meth:`drop_all` will work all the time but in
-    the second case a :meth:`flask.Flask.request_context` has to exist.
+    the second case a :meth:`flask.Flask.app_context` has to exist.
 
     By default Flask-SQLAlchemy will apply some backend-specific settings
     to improve your experience with them.  As of SQLAlchemy 0.6 SQLAlchemy
@@ -660,13 +686,22 @@ class SQLAlchemy(object):
         return self.Model.metadata
 
     def create_scoped_session(self, options=None):
-        """Helper factory method that creates a scoped session."""
+        """Helper factory method that creates a scoped session.  It
+        internally calls :meth:`create_session`.
+        """
         if options is None:
             options = {}
-        scopefunc=options.pop('scopefunc', None)
-        return orm.scoped_session(
-            partial(_SignallingSession, self, **options), scopefunc=scopefunc
-        )
+        scopefunc = options.pop('scopefunc', None)
+        return orm.scoped_session(partial(self.create_session, options),
+                                  scopefunc=scopefunc)
+
+    def create_session(self, options):
+        """Creates the session.  The default implementation returns a
+        :class:`SignallingSession`.
+
+        .. versionadded:: 2.0
+        """
+        return SignallingSession(self, **options)
 
     def make_declarative_base(self):
         """Creates the declarative base."""
@@ -691,6 +726,7 @@ class SQLAlchemy(object):
         app.config.setdefault('SQLALCHEMY_POOL_RECYCLE', None)
         app.config.setdefault('SQLALCHEMY_MAX_OVERFLOW', None)
         app.config.setdefault('SQLALCHEMY_COMMIT_ON_TEARDOWN', False)
+        app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', True)
 
         if not hasattr(app, 'extensions'):
             app.extensions = {}
@@ -832,20 +868,23 @@ class SQLAlchemy(object):
             retval.update(dict((table, engine) for table in tables))
         return retval
 
-    def _execute_for_all_tables(self, app, bind, operation):
+    def _execute_for_all_tables(self, app, bind, operation, skip_tables=False):
         app = self.get_app(app)
 
         if bind == '__all__':
             binds = [None] + list(app.config.get('SQLALCHEMY_BINDS') or ())
-        elif isinstance(bind, basestring) or bind is None:
+        elif isinstance(bind, string_types) or bind is None:
             binds = [bind]
         else:
             binds = bind
 
         for bind in binds:
-            tables = self.get_tables_for_bind(bind)
+            extra = {}
+            if not skip_tables:
+                tables = self.get_tables_for_bind(bind)
+                extra['tables'] = tables
             op = getattr(self.Model.metadata, operation)
-            op(bind=self.get_engine(app, bind), tables=tables)
+            op(bind=self.get_engine(app, bind), **extra)
 
     def create_all(self, bind='__all__', app=None):
         """Creates all tables.
@@ -869,7 +908,7 @@ class SQLAlchemy(object):
         .. versionchanged:: 0.12
            Parameters were added
         """
-        self._execute_for_all_tables(app, bind, 'reflect')
+        self._execute_for_all_tables(app, bind, 'reflect', skip_tables=True)
 
     def __repr__(self):
         app = None

@@ -1,4 +1,4 @@
-#!/home/loren/apps/flask/qtube/env/bin/python
+#!/Users/loren/dev/stube/env/bin/python2.7
 
 # -*- coding: utf-8 -*-
 import re
