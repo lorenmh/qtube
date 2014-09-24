@@ -250,7 +250,7 @@ angular.module('ng').filter('trim', function() {
 /* objects: Service
  * Holds the application wide objects that we will be using, namely Video 
  * and Queue.  Might be better to have this as a value instead of a service,
- * but it works just fine.
+ * but it works fine.
  */
 app.factory('objects', function() {
   var Video = function(id, author, title, thumb_url, desc, dur_s, dur_sf) {
@@ -935,7 +935,7 @@ app.factory('searchService', ['$http', 'searchConfig', 'formats',
 }]);
 
 app.factory('websocket', [function() {
-  srv = {};
+  socket = io.connect('http://127.0.0.1:3000')
   var playPause, next, prev;
 
   srv.setPlayPause = function(fn) {
@@ -955,26 +955,25 @@ app.factory('websocket', [function() {
   var uri = uri_split.join(':') + '/vsock';
   var ws = new WebSocket(uri)
   
-  srv.registerId = function(id) {
+  srv.joinChannel = function(id) {
     console.log('register')
-    ws.send('{"register":"' + id + '"}');
+    socket.emit('join', id);
   };
 
-  ws.onmessage = function(m) {
-    console.log('onmessage');
-    console.log(m);
-    var msg = JSON.parse(m.data);
+  socket.on('broadcast', function(msg) {
+    console.log('broadcast');
     console.log(msg);
-    if (msg.emit) {
-      if (msg.emit == 'play_pause') {
-        playPause();
-      } else if (msg.emit == 'next') {
-        next();
-      } else if (msg.emit == 'prev') {
-        prev();
-      }
+    if (msg == 'play_pause') {
+      console.log('msg == play_pause');
+      playPause();
+    } else if (msg == 'next') {
+      next();
+    } else if (msg == 'prev') {
+      prev();
     }
-  };
+  });
+
+  srv.s = socket;
 
   return srv;
 }]);
@@ -1166,7 +1165,7 @@ app.controller('AppController', [
         .then( function(obj) {
           queueService.loadFromObj(obj);
           syncWithQueue();
-          websocket.registerId(token);
+          websocket.joinChannel(token);
         });
   };
 
@@ -1197,7 +1196,7 @@ app.controller('AppController', [
         .then( function(token) {
           // once save is complete, update the path to include the data's token
           setQueuePath(token);
-          websocket.registerId(token);
+          websocket.joinChannel(token);
         });
   };
 

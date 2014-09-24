@@ -1,0 +1,11 @@
+{
+  "name": "node-socketio",
+  "version": "0.0.1",
+  "description": "will serve app as socket.io server",
+  "dependencies": {
+    "express": "*",
+    "socket.io": "*",
+    "zmq": "*",
+	"promise": "*"
+  }
+}

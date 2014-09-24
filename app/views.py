@@ -1,15 +1,25 @@
 from flask import render_template, session, request
 from models import Data, data_token
 from app import app, db
-import os, binascii
-import json
+import os, binascii, json, re
 
 rsock = {}
 vsock = {}
 
+app.USER_AGENTS = re.compile('android|fennec|iemobile|iphone|opera (?:mini|mobi)|mobile')
+
+def mobile():
+    return app.USER_AGENTS.search(request.user_agent.string.lower())
+
+
 @app.route('/')
 def appView(path=None):
-    return render_template('app.html')
+    if not mobile():
+        print "request not mobile"
+        return render_template('app.html')
+    else:
+        print "request is mobile"
+        return render_template('mobile.html')
 
 @app.route('/api/q/', methods=['POST'])
 def queue_post():
@@ -36,6 +46,7 @@ def add_to_db(mdl):
     db.session.add(mdl)
     db.session.commit()
 
+'''
 def broadcast(msg):
     for ws in websockets:
         ws.send(msg)
@@ -83,7 +94,7 @@ def video_socket():
             decode_vmsg(ws, ws.receive())
     return
 
-
+'''
 """ Use the Flask static routes while in debug / development, switch over to
     using the Front-end web-server (nginx / apache) when in production
 """

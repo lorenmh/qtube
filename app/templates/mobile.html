@@ -1,0 +1,66 @@
+<html>
+<head>
+  <script src="http://127.0.0.1:3000/socket.io/socket.io.js"></script>
+</head>
+<body>
+<h1>MOBILE</h1>
+<form id="channel-form">
+  <input id="channel-input" type="text" />
+  <input type="submit" value="ok" />
+</form>
+  <button onclick="playPause()" id="play_pause">Play / Pause</button>
+  <button onclick="next()" id="next">Next</button>
+  <button onclick="prev()" id="prev">Previous</button>
+<script type="text/javascript">
+  var form = document.getElementById('channel-form');
+  var input = document.getElementById('channel-input');
+  var socket = io.connect('http://127.0.0.1:3000')
+  var resource = location.href.split('/')[4];
+  var channel = location.href.split('/')[5];
+
+  var join = function() {
+    console.log('join');
+    socket.emit('join', channel);
+    hideForm();
+  };
+
+  var playPause = function() {
+    socket.emit('broadcast', 'play_pause');
+  };
+
+  var next = function() {
+    socket.emit('broadcast', 'next');
+  };
+
+  var prev = function() {
+    socket.emit('broadcast', 'prev');
+  };
+
+  form.onsubmit = function(e) {
+    e.preventDefault();
+    if (input.value.length > 0) {
+      channel = input.value;
+      join();
+    }
+  };
+
+  var hideForm = function() {
+    form.style.display = "none";
+  };
+
+  var showForm = function() {
+    // default for display is ''
+    form.style.display = "";
+  }
+
+  if (resource == 'q') {
+    console.log('resource equal q')
+    if (channel) {
+      join();
+    }
+  }
+
+console.log('test')
+</script>
+</body>
+</html>
