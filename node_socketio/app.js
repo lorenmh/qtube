@@ -1,15 +1,16 @@
 var express = require('express'),
     app = express();
 
-var redis = require('redis').createClient(3010);
+var redis = require('redis').createClient(3310);
 
 var http = require('http').Server(app);
-var io = require('socket.io')(http);
+var io = require('socket.io').listen(http, { path: '/socket.io' });
 
 var Promise = require('promise');
 var crypto = require('crypto');
 
-app.get('/', function(req, res){
+app.get('/s', function(req, res){
+  console.log('get root /');
   res.sendfile('index.html');
 });
 
@@ -92,6 +93,6 @@ io.on('connection', function(socket){
   });
 });
 
-http.listen(3000, function(){
-  console.log('listening on *:3000');
+http.listen(3300, function(){
+  console.log('listening on *:3300');
 });

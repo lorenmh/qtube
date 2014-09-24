@@ -210,7 +210,7 @@ var app = angular.module('qTube', ['player', 'ui.sortable']);
  * Holds the API URI
  */
 app.value('apiConfig', {
-  baseUri: 'http://127.0.0.1:5000/api/',
+  baseUri: 'http://wineandbocce.com/api/',
   queueUri: 'q/'
 });
 
@@ -935,7 +935,7 @@ app.factory('searchService', ['$http', 'searchConfig', 'formats',
 }]);
 
 app.factory('websocket', [function() {
-  socket = io.connect('http://127.0.0.1:3000')
+  socket = io.connect('http://wineandbocce.com/', { path: '/s/socket.io' });
   var playPause, next, prev;
 
   srv.setPlayPause = function(fn) {
@@ -950,11 +950,6 @@ app.factory('websocket', [function() {
     prev = fn;
   }
 
-  var uri_split = location.origin.split(':');
-  uri_split[0] = "ws";
-  var uri = uri_split.join(':') + '/vsock';
-  var ws = new WebSocket(uri)
-  
   srv.joinChannel = function(id) {
     console.log('register')
     socket.emit('join', id);

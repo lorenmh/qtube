@@ -176,31 +176,42 @@ a {
   display: inline-block;
   background: url('/img/icons-small.png');
   background-repeat: no-repeat;
-  background-position-y: 0;
   cursor: pointer;
   width: 30px;
   height: 30px;
   margin: 5px;
 }
 
-.queue-button:hover, .teaser-button:hover {
-  background-position-y: -30px;
+.queue-button.remove, .teaser-button.remove {
+  background-position: -150px 0;
 }
 
-.queue-button.remove, .teaser-button.remove {
-  background-position-x: -150px;
+.queue-button.remove:hover, .teaser-button.remove:hover {
+  background-position: -150px -30px;
 }
 
 .queue-button.play, .teaser-button.play {
-  background-position-x: 2px;
+  background-position: 2px 0;
+}
+
+.queue-button.play:hover, .teaser-button.play:hover {
+  background-position: 2px -30px;
 }
 
 .teaser-button.add {
-  background-position-x: -210px;
+  background-position: -210px 0;
+}
+
+.teaser-button.add:hover {
+  background-position: -210px -30px;
 }
 
 .queue-button.set-index {
-  background-position-x: -180px;
+  background-position: -180px 0;
+}
+
+.queue-button.set-index:hover {
+  background-position: -180px -30px;
 }
 
 
