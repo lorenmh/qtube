@@ -934,8 +934,7 @@ app.factory('searchService', ['$http', 'searchConfig', 'formats',
     return srv;
 }]);
 
-app.factory('websocket', [function() {
-  socket = io.connect('http://wineandbocce.com/', { path: '/s/socket.io' });
+app.factory('socket', [function() {
   var playPause, next, prev;
 
   srv.setPlayPause = function(fn) {
@@ -950,25 +949,26 @@ app.factory('websocket', [function() {
     prev = fn;
   }
 
-  srv.joinChannel = function(id) {
-    console.log('register')
-    socket.emit('join', id);
-  };
+  try {
+    var socket = io.connect('http://wineandbocce.com/', { path: '/s/socket.io' });
+    socket.on('broadcast', function(msg) {
+      if (msg == 'play_pause') {
+        playPause();
+      } else if (msg == 'next') {
+        next();
+      } else if (msg == 'prev') {
+        prev();
+      }
+    });
+    
+    srv.joinChannel = function(id) {
+      socket.emit('join', id);
+    };
 
-  socket.on('broadcast', function(msg) {
-    console.log('broadcast');
-    console.log(msg);
-    if (msg == 'play_pause') {
-      console.log('msg == play_pause');
-      playPause();
-    } else if (msg == 'next') {
-      next();
-    } else if (msg == 'prev') {
-      prev();
-    }
-  });
-
-  srv.s = socket;
+  } catch (e) {
+    console.log('[socket.io not initialized] ' + e);
+    srv.joinChannel = function() {};
+  }
 
   return srv;
 }]);
@@ -983,14 +983,11 @@ app.controller('AppController', [
   'formats', 
   'ytApi',
   'ytConfig',
-  'websocket',
+  'socket',
   '$scope',
   '$location',
   '$interval', 
-  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, websocket, $scope, $location, $interval) {
-
-  _$ = $scope;
-  _w = websocket;
+  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, socket, $scope, $location, $interval) {
 
   var init_app = function() {
     var path_arr = $location.path().split('/').splice(1);
@@ -1160,7 +1157,7 @@ app.controller('AppController', [
         .then( function(obj) {
           queueService.loadFromObj(obj);
           syncWithQueue();
-          websocket.joinChannel(token);
+          socket.joinChannel(token);
         });
   };
 
@@ -1191,7 +1188,7 @@ app.controller('AppController', [
         .then( function(token) {
           // once save is complete, update the path to include the data's token
           setQueuePath(token);
-          websocket.joinChannel(token);
+          socket.joinChannel(token);
         });
   };
 
@@ -1267,9 +1264,9 @@ app.controller('AppController', [
     }
   };
 
-  websocket.setPlayPause($scope.play_pause);
-  websocket.setNext($scope.next);
-  websocket.setPrev($scope.previous);
+  socket.setPlayPause($scope.play_pause);
+  socket.setNext($scope.next);
+  socket.setPrev($scope.previous);
 
   // returns true if the video is in the queue
   $scope.videoInVideos = function(video) {

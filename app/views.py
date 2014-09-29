@@ -15,10 +15,8 @@ def mobile():
 @app.route('/')
 def appView(path=None):
     if not mobile():
-        print "request not mobile"
         return render_template('app.html')
     else:
-        print "request is mobile"
         return render_template('mobile.html')
 
 @app.route('/api/q/', methods=['POST'])
