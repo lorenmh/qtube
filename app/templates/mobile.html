@@ -1,0 +1,110 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1" />
+  <link rel="stylesheet" type="text/css" href="css/mobile-style.css" />
+  <script src="/s/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div class="controls-wrap">
+  <form id="channel-form">
+    <input id="channel-input" type="text" placeholder="queue id ######"/>
+    <input id="channel-form-submit" type="submit" value="ok" />
+  </form>
+  <button id="connection-button" onclick="reset_connection()">reset connection</button>
+  <div class="button-wrap">
+    <button class="remote-button" onclick="prev()" id="prev">Previous</button>
+    <button class="remote-button" onclick="playPause()" id="play_pause">Play / Pause</button>
+    <button class="remote-button" onclick="next()" id="next">Next</button>
+  </div>
+</div>
+<script type="text/javascript">
+  var uri = "http://wineandbocce.com/",
+      path = { path: "/s/socket.io/" };
+  var form = document.getElementById('channel-form');
+  var input = document.getElementById('channel-input');
+  var connection = document.getElementById('connection');
+  var socket = io.connect(uri, path);
+  var resource = location.href.split('/')[4];
+  window.channel = window.channel || location.href.split('/')[5];
+
+  var join = function() {
+    if (window.channel) {
+      socket.emit('join', window.channel);
+    }
+  };
+
+  var playPause = function() {
+    socket.emit('broadcast', 'play_pause');
+  };
+
+  var reset_connection = function() {
+    socket.disconnect();
+    location.reload();
+  };
+
+  var next = function() {
+    socket.emit('broadcast', 'next');
+  };
+
+  var prev = function() {
+    socket.emit('broadcast', 'prev');
+  };
+
+  var set_q_uri = function(channel) {
+    location.href = "#/q/" + channel;
+  };
+
+  form.onsubmit = function(e) {
+    e.preventDefault();
+    if (input.value.length > 0) {
+      window.channel = input.value;
+      set_q_uri(window.channel);
+      join();
+    }
+  };
+
+  /*
+  var hideForm = function() {
+    form.style.display = "none";
+  };
+
+  var showForm = function() {
+    // default for display is ''
+    form.style.display = "";
+  }
+  */
+
+  if (window.channel) {
+    join();
+  }
+
+  /*
+  var timer = function() {
+    var start = + new Date();
+    return function() { return (+ new Date()) - start; };
+  };
+
+  var last_timer = timer();
+  setInterval(function() {
+      var time = last_timer();
+      console.log(time);
+    if (time > 3000) {
+      console.log('timer up, reset connection');
+      alert('time > 3000');
+      reset_connection();
+    }
+    last_timer = timer();
+  }, 1000);
+
+  window.firstLoad = true;
+  window.addEventListener("pageshow", function(){
+    alert('pageshow');
+    if (window.firstLoad) {
+      window.firstLoad = false;
+    } else {
+      reset_connection();
+    }
+  }, false);*/
+</script>
+</body>
+</html>

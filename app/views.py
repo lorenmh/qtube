@@ -1,11 +1,23 @@
 from flask import render_template, session, request
 from models import Data, data_token
 from app import app, db
-import os, binascii
+import os, binascii, json, re
+
+rsock = {}
+vsock = {}
+
+app.USER_AGENTS = re.compile('android|fennec|iemobile|iphone|opera (?:mini|mobi)|mobile')
+
+def mobile():
+    return app.USER_AGENTS.search(request.user_agent.string.lower())
+
 
 @app.route('/')
 def appView(path=None):
-    return render_template('app.html')
+    if not mobile():
+        return render_template('app.html')
+    else:
+        return render_template('mobile.html')
 
 @app.route('/api/q/', methods=['POST'])
 def queue_post():
@@ -32,7 +44,55 @@ def add_to_db(mdl):
     db.session.add(mdl)
     db.session.commit()
 
+'''
+def broadcast(msg):
+    for ws in websockets:
+        ws.send(msg)
 
+def decode_vmsg(ws, msg):
+    try:
+        msg = json.loads(msg)
+        if 'register' in msg:
+            vsock[msg['register']] = ws
+            vsock[ws] = msg['register']
+            ws.send('registered')
+        if 'emit' in msg:
+            rsock[vsock[ws]].send(json.dumps({"emit":msg['emit']}))
+            ws.send('emitted')
+    except:
+        ws.send('decode error')
+
+def decode_rmsg(ws, msg):
+    #try:
+    msg = json.loads(msg)
+    if 'register' in msg:
+        rsock[msg['register']] = ws
+        rsock[ws] = msg['register']
+        ws.send('registered')
+    if 'emit' in msg:
+        vsock[rsock[ws]].send(json.dumps({"emit":msg['emit']}))
+        ws.send('emitted')
+    #except:
+    #    ws.send('decode error')
+
+
+@app.route('/rsock')
+def remote_socket():
+    if request.environ.get('wsgi.websocket'):
+        ws = request.environ['wsgi.websocket']
+        while True:
+            decode_rmsg(ws, ws.receive())
+    return
+
+@app.route('/vsock')
+def video_socket():
+    if request.environ.get('wsgi.websocket'):
+        ws = request.environ['wsgi.websocket']
+        while True:
+            decode_vmsg(ws, ws.receive())
+    return
+
+'''
 """ Use the Flask static routes while in debug / development, switch over to
     using the Front-end web-server (nginx / apache) when in production
 """

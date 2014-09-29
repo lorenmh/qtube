@@ -23,7 +23,7 @@ a {
   display: inline-block;
   background: url('/img/icons-medium.png');
   background-repeat: no-repeat;
-  background-position-y: 0;
+  /*background-position-y: 0;*/
   cursor: pointer;
   width: 60px;
   height: 60px;
@@ -31,7 +31,7 @@ a {
 }
 
 .player-button:hover {
-  background-position-y: -60px;
+  /*background-position-y: -60px;*/
 }
 
 .teaser-button {
@@ -44,24 +44,44 @@ a {
 }
 
 .player-button.previous {
-  background-position-x: -120px;
+  background-position: -120px 0;
+}
+
+.player-button.previous:hover {
+  background-position: -120px -60px;
 }
 
 .player-button.next {
-  background-position-x: -180px;
+  background-position: -180px 0;
+}
+
+.player-button.next:hover {
+  background-position: -180px -60;
 }
 
 .player-button.play {
-  background-position-x: 4px;
+  background-position: 4px 0;
+}
+
+.player-button.play:hover {
+  background-position: 4px -60px;
 }
 
 .player-button.pause {
-  background-position-x: -60px;
+  background-position: -60px 0;
   /*background-color:black;*/
 }
 
+.player-button.pause:hover {
+  background-position: -60px -60px;
+}
+
 .player-button.save {
-  background-position-x: -240px;
+  background-position: -240px 0;
+}
+
+.player-button.save:hover {
+  background-position: -240px -60px;
 }
 
 #player-progress-bar {
@@ -156,31 +176,42 @@ a {
   display: inline-block;
   background: url('/img/icons-small.png');
   background-repeat: no-repeat;
-  background-position-y: 0;
   cursor: pointer;
   width: 30px;
   height: 30px;
   margin: 5px;
 }
 
-.queue-button:hover, .teaser-button:hover {
-  background-position-y: -30px;
+.queue-button.remove, .teaser-button.remove {
+  background-position: -150px 0;
 }
 
-.queue-button.remove, .teaser-button.remove {
-  background-position-x: -150px;
+.queue-button.remove:hover, .teaser-button.remove:hover {
+  background-position: -150px -30px;
 }
 
 .queue-button.play, .teaser-button.play {
-  background-position-x: 2px;
+  background-position: 2px 0;
+}
+
+.queue-button.play:hover, .teaser-button.play:hover {
+  background-position: 2px -30px;
 }
 
 .teaser-button.add {
-  background-position-x: -210px;
+  background-position: -210px 0;
+}
+
+.teaser-button.add:hover {
+  background-position: -210px -30px;
 }
 
 .queue-button.set-index {
-  background-position-x: -180px;
+  background-position: -180px 0;
+}
+
+.queue-button.set-index:hover {
+  background-position: -180px -30px;
 }
 
 

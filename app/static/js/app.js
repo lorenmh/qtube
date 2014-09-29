@@ -210,7 +210,7 @@ var app = angular.module('qTube', ['player', 'ui.sortable']);
  * Holds the API URI
  */
 app.value('apiConfig', {
-  baseUri: 'http://qtube.io/api/',
+  baseUri: 'http://wineandbocce.com/api/',
   queueUri: 'q/'
 });
 
@@ -250,7 +250,7 @@ angular.module('ng').filter('trim', function() {
 /* objects: Service
  * Holds the application wide objects that we will be using, namely Video 
  * and Queue.  Might be better to have this as a value instead of a service,
- * but it works just fine.
+ * but it works fine.
  */
 app.factory('objects', function() {
   var Video = function(id, author, title, thumb_url, desc, dur_s, dur_sf) {
@@ -934,6 +934,45 @@ app.factory('searchService', ['$http', 'searchConfig', 'formats',
     return srv;
 }]);
 
+app.factory('socket', [function() {
+  var playPause, next, prev;
+
+  srv.setPlayPause = function(fn) {
+    playPause = fn;
+  }
+
+  srv.setNext = function(fn) {
+    next = fn;
+  }
+
+  srv.setPrev = function(fn) {
+    prev = fn;
+  }
+
+  try {
+    var socket = io.connect('http://wineandbocce.com/', { path: '/s/socket.io' });
+    socket.on('broadcast', function(msg) {
+      if (msg == 'play_pause') {
+        playPause();
+      } else if (msg == 'next') {
+        next();
+      } else if (msg == 'prev') {
+        prev();
+      }
+    });
+    
+    srv.joinChannel = function(id) {
+      socket.emit('join', id);
+    };
+
+  } catch (e) {
+    console.log('[socket.io not initialized] ' + e);
+    srv.joinChannel = function() {};
+  }
+
+  return srv;
+}]);
+
 app.controller('AppController', [
   'apiService',
   'queueService', 
@@ -944,10 +983,11 @@ app.controller('AppController', [
   'formats', 
   'ytApi',
   'ytConfig',
+  'socket',
   '$scope',
   '$location',
   '$interval', 
-  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, $scope, $location, $interval) {
+  function( apiService, queueService, searchService, suggestionService, objects, common, formats, ytApi, ytConfig, socket, $scope, $location, $interval) {
 
   var init_app = function() {
     var path_arr = $location.path().split('/').splice(1);
@@ -1117,6 +1157,7 @@ app.controller('AppController', [
         .then( function(obj) {
           queueService.loadFromObj(obj);
           syncWithQueue();
+          socket.joinChannel(token);
         });
   };
 
@@ -1147,6 +1188,7 @@ app.controller('AppController', [
         .then( function(token) {
           // once save is complete, update the path to include the data's token
           setQueuePath(token);
+          socket.joinChannel(token);
         });
   };
 
@@ -1221,6 +1263,10 @@ app.controller('AppController', [
       }
     }
   };
+
+  socket.setPlayPause($scope.play_pause);
+  socket.setNext($scope.next);
+  socket.setPrev($scope.previous);
 
   // returns true if the video is in the queue
   $scope.videoInVideos = function(video) {
